@@ -6,7 +6,8 @@ import {
   GitBranch,
   ChevronUp,
   X,
-  Hash,
+  FolderOpen,
+  Terminal,
   Wrench
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,8 @@ import type { ClaudeStreamMessage } from "./AgentExecution";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useTrackEvent, useComponentMetrics, useWorkflowTracking } from "@/hooks";
 import { SessionPersistenceService } from "@/services/sessionPersistence";
+import { projectName } from "@/lib/projectPaths";
+import { isTauriRuntime } from "@/lib/apiAdapter";
 
 interface ClaudeCodeSessionProps {
   /**
@@ -43,7 +46,9 @@ interface ClaudeCodeSessionProps {
   /**
    * Callback to go back
    */
-  onBack: () => void;
+  onBack?: () => void;
+  isActive?: boolean;
+  onSessionIdentified?: (id: string, prompt: string) => void;
   /**
    * Callback to open hooks configuration
    */
@@ -72,6 +77,8 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
   session,
   initialProjectPath = "",
   className,
+  isActive = true,
+  onSessionIdentified,
   onStreamingChange,
   onProjectPathChange,
 }) => {
@@ -552,7 +559,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
 
           // Attempt to extract session_id on the fly (for the very first init)
           try {
-            const msg = JSON.parse(event.payload) as ClaudeStreamMessage;
+            const msg = (typeof event.payload === 'string' ? JSON.parse(event.payload) : event.payload) as ClaudeStreamMessage;
             if (msg.type === 'system' && msg.subtype === 'init' && msg.session_id) {
               if (!currentSessionId || currentSessionId !== msg.session_id) {
                 console.log('[ClaudeCodeSession] Detected new session_id from generic listener:', msg.session_id);
@@ -563,6 +570,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
                 if (!extractedSessionInfo) {
                   const projectId = projectPath.replace(/[^a-zA-Z0-9]/g, '-');
                   setExtractedSessionInfo({ sessionId: msg.session_id, projectId });
+                  onSessionIdentified?.(msg.session_id, prompt);
                   
                   // Save session data for restoration
                   SessionPersistenceService.saveSession(
@@ -574,7 +582,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
                 }
 
                 // Switch to session-specific listeners
-                await attachSessionSpecificListeners(msg.session_id);
+                if (isTauriRuntime()) await attachSessionSpecificListeners(msg.session_id);
               }
             }
           } catch {
@@ -684,6 +692,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
           setIsLoading(false);
           hasActiveSessionRef.current = false;
           isListeningRef.current = false; // Reset listening state
+          window.dispatchEvent(new CustomEvent('project-session-finished', { detail: projectPath }));
           
           // Track enhanced session stopped metrics when session completes
           if (effectiveSession && claudeSessionId) {
@@ -1151,7 +1160,12 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
     }
   };
 
-  // Cleanup event listeners and track mount state
+  const cleanupContext = useRef({ effectiveSession, messages, trackEvent });
+  useEffect(() => {
+    cleanupContext.current = { effectiveSession, messages, trackEvent };
+  }, [effectiveSession, messages, trackEvent]);
+
+  // Listener cleanup belongs to the mounted tab, not to changes in its session ID.
   useEffect(() => {
     isMountedRef.current = true;
     
@@ -1159,6 +1173,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
       console.log('[ClaudeCodeSession] Component unmounting, cleaning up listeners');
       isMountedRef.current = false;
       isListeningRef.current = false;
+      const { effectiveSession, messages, trackEvent } = cleanupContext.current;
       
       // Track session completion with engagement metrics
       if (effectiveSession) {
@@ -1202,12 +1217,12 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
         });
       }
     };
-  }, [effectiveSession, projectPath]);
+  }, []);
 
   const messagesList = (
     <div
       ref={parentRef}
-      className="flex-1 overflow-y-auto relative pb-20"
+      className="flex-1 overflow-y-auto relative"
       style={{
         contain: 'strict',
       }}
@@ -1273,10 +1288,10 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
     </div>
   );
 
-  const projectPathInput = null; // Removed project path display
+  const name = projectName(projectPath);
 
   // If preview is maximized, render only the WebviewPreview in full screen
-  if (showPreview && isPreviewMaximized) {
+  if (showPreview && isPreviewMaximized && isActive) {
     return (
       <AnimatePresence>
         <motion.div 
@@ -1301,7 +1316,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
 
   return (
     <TooltipProvider>
-      <div className={cn("flex flex-col h-full bg-background", className)}>
+      <div className={cn("relative flex h-full flex-col bg-background", className)}>
         <div className="w-full h-full flex flex-col">
 
         {/* Main Content Area */}
@@ -1314,7 +1329,6 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
             <SplitPane
               left={
                 <div className="h-full flex flex-col">
-                  {projectPathInput}
                   {messagesList}
                 </div>
               }
@@ -1336,8 +1350,14 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
           ) : (
             // Original layout when no preview
             <div className="h-full flex flex-col max-w-6xl mx-auto px-6">
-              {projectPathInput}
-              {messagesList}
+              {!session && messages.length === 0 && !isLoading && !error ? (
+                <div className="flex h-full min-h-0 flex-col items-center justify-center gap-5 text-center">
+                  <Terminal className="size-9 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  <h1 className="max-w-full break-words text-xl font-medium sm:text-2xl">
+                    {name ? <>What should we work on in {name}?</> : 'New chat'}
+                  </h1>
+                </div>
+              ) : messagesList}
               
               {isLoading && messages.length === 0 && (
                 <div className="flex items-center justify-center h-full">
@@ -1362,7 +1382,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 20 }}
-                className="fixed bottom-24 left-1/2 -translate-x-1/2 z-30 w-full max-w-3xl px-4"
+                className="absolute bottom-32 left-1/2 z-30 w-full max-w-3xl -translate-x-1/2 px-4"
               >
                 <div className="bg-background/95 backdrop-blur-md border rounded-lg shadow-lg p-3 space-y-2">
                   <div className="flex items-center justify-between">
@@ -1425,7 +1445,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
               transition={{ delay: 0.5 }}
-              className="fixed bottom-32 right-6 z-50"
+              className="absolute bottom-32 right-6 z-30"
             >
               <div className="flex items-center bg-background/95 backdrop-blur-md border rounded-full shadow-lg overflow-hidden">
                 <TooltipSimple content="Scroll to top" side="top">
@@ -1503,11 +1523,20 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
           )}
 
           <div className={cn(
-            "fixed bottom-0 left-0 right-0 transition-all duration-300 z-50",
-            showTimeline && "sm:right-96"
+            "relative z-20 shrink-0 px-3 pb-4 pt-1 sm:px-6",
+            showTimeline && "sm:mr-96"
           )}>
+            <div className="mx-auto max-w-3xl">
+              <div className="flex h-8 items-center justify-between gap-2 px-2 text-xs text-muted-foreground">
+                <span className="flex min-w-0 items-center gap-2" title={projectPath}>
+                  <FolderOpen className="size-4 shrink-0" aria-hidden="true" />
+                  <span className="truncate">{name || 'No project selected'}</span>
+                </span>
+                {totalTokens > 0 && <span className="shrink-0">{totalTokens.toLocaleString()} tokens</span>}
+              </div>
             <FloatingPromptInput
               ref={floatingPromptRef}
+              embedded
               onSend={handleSendPrompt}
               onCancel={handleCancelExecution}
               isLoading={isLoading}
@@ -1594,29 +1623,8 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
                 </>
               }
             />
-          </div>
-
-          {/* Token Counter - positioned under the Send button */}
-          {totalTokens > 0 && (
-            <div className="fixed bottom-0 left-0 right-0 z-30 pointer-events-none">
-              <div className="max-w-6xl mx-auto">
-                <div className="flex justify-end px-4 pb-2">
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
-                    className="bg-background/95 backdrop-blur-md border rounded-full px-3 py-1 shadow-lg pointer-events-auto"
-                  >
-                    <div className="flex items-center gap-1.5 text-xs">
-                      <Hash className="h-3 w-3 text-muted-foreground" />
-                      <span className="font-mono">{totalTokens.toLocaleString()}</span>
-                      <span className="text-muted-foreground">tokens</span>
-                    </div>
-                  </motion.div>
-                </div>
-              </div>
             </div>
-          )}
+          </div>
         </ErrorBoundary>
 
         {/* Timeline */}
@@ -1627,7 +1635,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={{ duration: 0.2, ease: "easeOut" }}
-              className="fixed right-0 top-0 h-full w-full sm:w-96 bg-background border-l border-border shadow-xl z-30 overflow-hidden"
+              className="absolute right-0 top-0 h-full w-full sm:w-96 bg-background border-l border-border shadow-xl z-30 overflow-hidden"
             >
               <div className="h-full flex flex-col">
                 {/* Timeline Header */}

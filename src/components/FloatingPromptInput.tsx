@@ -52,6 +52,7 @@ interface FloatingPromptInputProps {
    * Optional className for styling
    */
   className?: string;
+  embedded?: boolean;
   /**
    * Callback when cancel is clicked (only during loading)
    */
@@ -206,6 +207,7 @@ const FloatingPromptInputInner = (
     onSend,
     isLoading = false,
     disabled = false,
+    embedded = false,
     defaultModel = "sonnet",
     projectPath,
     className,
@@ -1056,7 +1058,9 @@ const FloatingPromptInputInner = (
       {/* Fixed Position Input Bar */}
       <div
         className={cn(
-          "fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-sm border-t border-border shadow-lg",
+          embedded
+            ? "relative rounded-lg border border-border bg-card"
+            : "fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-sm border-t border-border shadow-lg",
           dragActive && "ring-2 ring-primary ring-offset-2",
           className
         )}

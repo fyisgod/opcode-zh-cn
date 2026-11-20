@@ -131,14 +131,13 @@ const TabItem: React.FC<TabItemProps> = ({ tab, isActive, onClose, onClick, isDr
 
 interface TabManagerProps {
   className?: string;
+  onNewChat?: () => void;
 }
 
-export const TabManager: React.FC<TabManagerProps> = ({ className }) => {
+export const TabManager: React.FC<TabManagerProps> = ({ className, onNewChat }) => {
   const {
     tabs,
     activeTabId,
-    createChatTab,
-    createProjectsTab,
     closeTab,
     switchToTab,
     canAddTab
@@ -171,8 +170,7 @@ export const TabManager: React.FC<TabManagerProps> = ({ className }) => {
   // Listen for keyboard shortcut events
   useEffect(() => {
     const handleCreateTab = () => {
-      createProjectsTab();
-      trackEvent.tabCreated('projects');
+      onNewChat?.();
     };
 
     const handleCloseTab = async () => {
@@ -221,7 +219,7 @@ export const TabManager: React.FC<TabManagerProps> = ({ className }) => {
       window.removeEventListener('switch-to-previous-tab', handlePreviousTab);
       window.removeEventListener('switch-to-tab-by-index', handleTabByIndex as EventListener);
     };
-  }, [tabs, activeTabId, createChatTab, closeTab, switchToTab]);
+  }, [tabs, activeTabId, closeTab, switchToTab, onNewChat, trackEvent]);
 
   // Check scroll buttons visibility
   const checkScrollButtons = () => {
@@ -246,6 +244,12 @@ export const TabManager: React.FC<TabManagerProps> = ({ className }) => {
       window.removeEventListener('resize', checkScrollButtons);
     };
   }, [tabs]);
+
+  useEffect(() => {
+    if (!activeTabId) return;
+    const tab = document.getElementById(activeTabId);
+    tab?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [activeTabId]);
 
   const handleReorder = (newOrder: Tab[]) => {
     // Find the positions that changed
@@ -276,13 +280,6 @@ export const TabManager: React.FC<TabManagerProps> = ({ className }) => {
       trackEvent.tabClosed(tab.type);
     }
     await closeTab(id);
-  };
-
-  const handleNewTab = () => {
-    if (canAddTab()) {
-      createProjectsTab();
-      trackEvent.tabCreated('projects');
-    }
   };
 
   const scrollTabs = (direction: 'left' | 'right') => {
@@ -358,7 +355,7 @@ export const TabManager: React.FC<TabManagerProps> = ({ className }) => {
           
           {/* New tab button - positioned right after tabs */}
           <motion.button
-            onClick={handleNewTab}
+            onClick={onNewChat}
             disabled={!canAddTab()}
             whileTap={canAddTab() ? { scale: 0.97 } : {}}
             transition={{ duration: 0.15 }}
@@ -369,7 +366,8 @@ export const TabManager: React.FC<TabManagerProps> = ({ className }) => {
                 ? "hover:bg-muted/60 text-muted-foreground hover:text-foreground"
                 : "opacity-50 cursor-not-allowed text-muted-foreground"
             )}
-            title={canAddTab() ? "New project (Ctrl+T)" : "Maximum tabs reached"}
+            title={canAddTab() ? "New chat" : "Maximum tabs reached"}
+            aria-label="New chat tab"
           >
             <Plus className="w-4 h-4" />
           </motion.button>

@@ -26,6 +26,7 @@ export interface Tab {
 interface TabContextType {
   tabs: Tab[];
   activeTabId: string | null;
+  isReady: boolean;
   addTab: (tab: Omit<Tab, 'id' | 'order' | 'createdAt' | 'updatedAt'>) => string;
   removeTab: (id: string) => void;
   updateTab: (id: string, updates: Partial<Tab>) => void;
@@ -44,6 +45,7 @@ const MAX_TABS = 20;
 export const TabProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
+  const [isReady, setIsReady] = useState(false);
   const isInitialized = useRef(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout>();
 
@@ -57,7 +59,8 @@ export const TabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     TabPersistenceService.migrateFromOldFormat();
 
     // Try to load saved tabs
-    const { tabs: savedTabs, activeTabId: savedActiveTabId } = TabPersistenceService.loadTabs();
+    const { tabs: storedTabs, activeTabId: savedActiveTabId } = TabPersistenceService.loadTabs();
+    const savedTabs = storedTabs.filter(tab => tab.type !== 'projects');
     
     if (savedTabs.length > 0) {
       // Persisted project paths may be stale (older builds could save a wrongly
@@ -107,22 +110,10 @@ export const TabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }));
       
       setTabs(restoredTabs);
-      setActiveTabId(savedActiveTabId);
-    } else {
-      // Create default projects tab if no saved tabs
-      const defaultTab: Tab = {
-        id: generateTabId(),
-        type: 'projects',
-        title: 'Projects',
-        status: 'idle',
-        hasUnsavedChanges: false,
-        order: 0,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      setTabs([defaultTab]);
-      setActiveTabId(defaultTab.id);
+      const savedChat = restoredTabs.find(tab => tab.id === savedActiveTabId && tab.type === 'chat' && tab.initialProjectPath);
+      setActiveTabId(savedChat?.id ?? null);
     }
+    setIsReady(true);
     };
     
     loadTabs();
@@ -131,7 +122,7 @@ export const TabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Save tabs to localStorage with debounce
   useEffect(() => {
     // Don't save if not initialized
-    if (!isInitialized.current) return;
+    if (!isReady) return;
     
     // Clear existing timeout
     if (saveTimeoutRef.current) {
@@ -148,12 +139,12 @@ export const TabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [tabs, activeTabId]);
+  }, [tabs, activeTabId, isReady]);
 
   // Save tabs immediately when window is about to close
   useEffect(() => {
     const handleBeforeUnload = () => {
-      if (isInitialized.current && tabs.length > 0) {
+      if (isReady) {
         TabPersistenceService.saveTabs(tabs, activeTabId);
       }
     };
@@ -162,12 +153,8 @@ export const TabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      // Save one final time when component unmounts
-      if (isInitialized.current && tabs.length > 0) {
-        TabPersistenceService.saveTabs(tabs, activeTabId);
-      }
     };
-  }, [tabs, activeTabId]);
+  }, [tabs, activeTabId, isReady]);
 
   const generateTabId = () => {
     return `tab-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -261,6 +248,7 @@ export const TabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const value: TabContextType = {
     tabs,
     activeTabId,
+    isReady,
     addTab,
     removeTab,
     updateTab,

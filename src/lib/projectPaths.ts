@@ -15,6 +15,10 @@ export interface ProjectPathSource {
   path: string;
 }
 
+export function projectName(path: string): string {
+  return path.split(/[\\/]/).filter(Boolean).pop() || path;
+}
+
 /**
  * Builds a project id -> current path lookup from the backend project list.
  * Projects with an empty path are skipped so they can never overwrite a

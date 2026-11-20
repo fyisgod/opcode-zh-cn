@@ -631,19 +631,19 @@ pub async fn list_projects() -> Result<Vec<Project>, String> {
 fn list_projects_blocking() -> Result<Vec<Project>, String> {
     log::info!("Listing projects from ~/.claude/projects");
 
-    let claude_dir = get_claude_dir().map_err(|e| e.to_string())?;
-    let projects_dir = claude_dir.join("projects");
-
-    if !projects_dir.exists() {
-        log::warn!("Projects directory does not exist: {:?}", projects_dir);
-        return Ok(Vec::new());
-    }
+    let projects_dir = dirs::home_dir()
+        .ok_or_else(|| "Could not find home directory".to_string())?
+        .join(".claude")
+        .join("projects");
 
     let mut projects = Vec::new();
 
     // Read all directories in the projects folder
-    let entries = fs::read_dir(&projects_dir)
-        .map_err(|e| format!("Failed to read projects directory: {}", e))?;
+    let entries = match fs::read_dir(&projects_dir) {
+        Ok(entries) => entries,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(e) => return Err(format!("Failed to read projects directory: {}", e)),
+    };
 
     for entry in entries {
         let entry = entry.map_err(|e| format!("Failed to read directory entry: {}", e))?;
@@ -736,22 +736,13 @@ pub async fn create_project(path: String) -> Result<Project, String> {
     // Encode the path to create a project ID
     let project_id = encode_project_path(&path);
 
-    // Get claude directory
-    let claude_dir = get_claude_dir().map_err(|e| e.to_string())?;
-    let projects_dir = claude_dir.join("projects");
-
-    // Create projects directory if it doesn't exist
-    if !projects_dir.exists() {
-        fs::create_dir_all(&projects_dir)
-            .map_err(|e| format!("Failed to create projects directory: {}", e))?;
-    }
-
-    // Create project directory if it doesn't exist
-    let project_dir = projects_dir.join(&project_id);
-    if !project_dir.exists() {
-        fs::create_dir_all(&project_dir)
-            .map_err(|e| format!("Failed to create project directory: {}", e))?;
-    }
+    let project_dir = dirs::home_dir()
+        .ok_or_else(|| "Could not find home directory".to_string())?
+        .join(".claude")
+        .join("projects")
+        .join(&project_id);
+    fs::create_dir_all(&project_dir)
+        .map_err(|e| format!("Failed to create project directory: {}", e))?;
 
     // Get creation time
     let metadata = fs::metadata(&project_dir)

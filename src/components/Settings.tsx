@@ -95,7 +95,7 @@ export const Settings: React.FC<SettingsProps> = ({
   // Tab persistence state
   const [tabPersistenceEnabled, setTabPersistenceEnabled] = useState(true);
   // Startup intro preference
-  const [startupIntroEnabled, setStartupIntroEnabled] = useState(true);
+  const [startupIntroEnabled, setStartupIntroEnabled] = useState(false);
   
   // Load settings on mount
   useEffect(() => {
@@ -104,10 +104,10 @@ export const Settings: React.FC<SettingsProps> = ({
     loadAnalyticsSettings();
     // Load tab persistence setting
     setTabPersistenceEnabled(TabPersistenceService.isEnabled());
-    // Load startup intro setting (default to true if not set)
+    // The intro is opt-in.
     (async () => {
       const pref = await api.getSetting('startup_intro_enabled');
-      setStartupIntroEnabled(pref === null ? true : pref === 'true');
+      setStartupIntroEnabled(pref === 'true');
     })();
   }, []);
 

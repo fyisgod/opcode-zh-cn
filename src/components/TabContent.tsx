@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTabState } from '@/hooks/useTabState';
 import { useScreenTracking } from '@/hooks/useAnalytics';
@@ -30,6 +30,9 @@ interface TabPanelProps {
 
 const TabPanel: React.FC<TabPanelProps> = ({ tab, isActive }) => {
   const { updateTab } = useTabState();
+  const onStreamingChange = useCallback((isStreaming: boolean) => {
+    updateTab(tab.id, { status: isStreaming ? 'running' : 'idle' });
+  }, [tab.id, updateTab]);
   const [projects, setProjects] = React.useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = React.useState<Project | null>(null);
   const [sessions, setSessions] = React.useState<Session[]>([]);
@@ -250,20 +253,12 @@ const TabPanel: React.FC<TabPanelProps> = ({ tab, isActive }) => {
           <div className="h-full">
             <ClaudeCodeSession
               session={tab.sessionData} // Pass the full session object if available
-              initialProjectPath={tab.initialProjectPath || tab.sessionId}
-              onBack={() => {
-                // Go back to projects view in the same tab
-                updateTab(tab.id, {
-                  type: 'projects',
-                  title: 'Projects',
-                });
-              }}
-              onProjectPathChange={(path: string) => {
-                // Update tab title with directory name
-                const dirName = path.split('/').pop() || path.split('\\').pop() || 'Session';
-                updateTab(tab.id, {
-                  title: dirName
-                });
+              initialProjectPath={tab.initialProjectPath}
+              isActive={isActive}
+              onStreamingChange={onStreamingChange}
+              onSessionIdentified={(id, prompt) => {
+                const title = prompt.trim().split(/\r?\n/, 1)[0].slice(0, 100) || tab.title;
+                updateTab(tab.id, { sessionId: id, title });
               }}
             />
           </div>
@@ -380,7 +375,7 @@ const TabPanel: React.FC<TabPanelProps> = ({ tab, isActive }) => {
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -8 }}
         transition={{ duration: 0.15 }}
-        className={`h-full w-full ${panelVisibilityClass}`}
+        className={`absolute inset-0 ${panelVisibilityClass}`}
       >
         <Suspense
           fallback={
@@ -397,8 +392,8 @@ const TabPanel: React.FC<TabPanelProps> = ({ tab, isActive }) => {
   );
 };
 
-export const TabContent: React.FC = () => {
-  const { tabs, activeTabId, createChatTab, createProjectsTab, findTabBySessionId, createClaudeFileTab, createAgentExecutionTab, createCreateAgentTab, createImportAgentTab, closeTab, updateTab } = useTabState();
+export const TabContent: React.FC<{ emptyState?: React.ReactNode }> = ({ emptyState }) => {
+  const { tabs, activeTabId, createChatTab, findTabBySessionId, createClaudeFileTab, createAgentExecutionTab, createCreateAgentTab, createImportAgentTab, closeTab, updateTab } = useTabState();
   
   // Listen for events to open sessions in tabs
   useEffect(() => {
@@ -513,21 +508,7 @@ export const TabContent: React.FC = () => {
         ))}
       </AnimatePresence>
       
-      {tabs.length === 0 && (
-        <div className="flex items-center justify-center h-full text-muted-foreground">
-          <div className="text-center">
-            <p className="text-lg mb-2">No projects open</p>
-            <p className="text-sm mb-4">Click to start a new project</p>
-            <Button
-              onClick={() => createProjectsTab()}
-              size="default"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              New Project
-            </Button>
-          </div>
-        </div>
-      )}
+      {!activeTabId && emptyState}
     </div>
   );
 };

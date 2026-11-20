@@ -21,8 +21,7 @@ import { NFOCredits } from "@/components/NFOCredits";
 import { ClaudeBinaryDialog } from "@/components/ClaudeBinaryDialog";
 import { Toast, ToastContainer } from "@/components/ui/toast";
 import { ProjectSettings } from '@/components/ProjectSettings';
-import { TabManager } from "@/components/TabManager";
-import { TabContent } from "@/components/TabContent";
+import { ProjectWorkspace } from "@/components/ProjectWorkspace";
 import { useTabState } from "@/hooks/useTabState";
 import { useAppLifecycle, useTrackEvent } from "@/hooks";
 import { StartupIntro } from "@/components/StartupIntro";
@@ -337,14 +336,7 @@ function AppContent() {
         ) : null;
       
       case "tabs":
-        return (
-          <div className="h-full flex flex-col">
-            <TabManager className="flex-shrink-0" />
-            <div className="flex-1 overflow-hidden">
-              <TabContent />
-            </div>
-          </div>
-        );
+        return <ProjectWorkspace />;
       
       case "usage-dashboard":
         return (
@@ -500,7 +492,7 @@ function App() {
       if (cached === 'true') return true;
       if (cached === 'false') return false;
     } catch (_ignore) {}
-    return true; // default if no cache
+    return false;
   });
 
   useEffect(() => {
@@ -508,17 +500,16 @@ function App() {
     (async () => {
       try {
         const pref = await api.getSetting('startup_intro_enabled');
-        const enabled = pref === null ? true : pref === 'true';
+        const enabled = pref === 'true';
         if (enabled) {
-          // keep intro visible and hide after duration
+          setShowIntro(true);
           timer = window.setTimeout(() => setShowIntro(false), 2000);
         } else {
           // user disabled intro: hide immediately to avoid any overlay delay
           setShowIntro(false);
         }
-      } catch (err) {
-        // On failure, show intro once to keep UX consistent
-        timer = window.setTimeout(() => setShowIntro(false), 2000);
+      } catch {
+        setShowIntro(false);
       }
     })();
     return () => {

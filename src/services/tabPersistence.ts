@@ -58,7 +58,7 @@ export class TabPersistenceService {
       // Filter out tabs that shouldn't be persisted
       const persistableTabs = tabs.filter(tab => {
         // Don't persist tabs with running status (they're likely stale)
-        if (tab.status === 'running') return false;
+        if (tab.status === 'running' && tab.type !== 'chat') return false;
         
         // Don't persist create/import agent tabs (they're temporary)
         if (tab.type === 'create-agent' || tab.type === 'import-agent') return false;
@@ -89,6 +89,8 @@ export class TabPersistenceService {
       // Save active tab ID
       if (activeTabId && persistableTabs.some(tab => tab.id === activeTabId)) {
         localStorage.setItem(ACTIVE_TAB_KEY, activeTabId);
+      } else {
+        localStorage.removeItem(ACTIVE_TAB_KEY);
       }
     } catch (error) {
       console.error('Failed to save tabs:', error);
