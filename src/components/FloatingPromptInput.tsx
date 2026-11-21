@@ -7,7 +7,6 @@ import {
   Minimize2,
   ChevronUp,
   Sparkles,
-  Zap,
   Square,
   Brain,
   Lightbulb,
@@ -19,6 +18,8 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Popover } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { initialModel, savedProviderFor, type ModelProvider, type ModelSelection } from "@/lib/modelProvider";
 import { TooltipProvider, TooltipSimple, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip-modern";
 import { FilePicker } from "./FilePicker";
 import { SlashCommandPicker } from "./SlashCommandPicker";
@@ -32,7 +33,7 @@ interface FloatingPromptInputProps {
   /**
    * Callback when prompt is sent
    */
-  onSend: (prompt: string, model: "sonnet" | "opus") => void;
+  onSend: (prompt: string, selection: ModelSelection) => void;
   /**
    * Whether the input is loading
    */
@@ -45,7 +46,11 @@ interface FloatingPromptInputProps {
    * Default model to select
    */
   defaultModel?: "sonnet" | "opus";
-  customModel?: string | null;
+  modelSelection?: ModelSelection;
+  onModelChange?: (selection: ModelSelection) => void;
+  providers?: ModelProvider[];
+  modelsLoaded?: boolean;
+  modelsError?: boolean;
   /**
    * Project path for file picker
    */
@@ -165,33 +170,9 @@ const ThinkingModeIndicator: React.FC<{ level: number; color?: string }> = ({ le
   );
 };
 
-type Model = {
-  id: "sonnet" | "opus";
-  name: string;
-  description: string;
-  icon: React.ReactNode;
-  shortName: string;
-  color: string;
-};
-
-const MODELS: Model[] = [
-  {
-    id: "sonnet",
-    name: "Claude 4 Sonnet",
-    description: "Faster, efficient for most tasks",
-    icon: <Zap className="h-3.5 w-3.5" />,
-    shortName: "S",
-    color: "text-primary"
-  },
-  {
-    id: "opus",
-    name: "Claude 4 Opus",
-    description: "More capable, better for complex tasks",
-    icon: <Zap className="h-3.5 w-3.5" />,
-    shortName: "O",
-    color: "text-primary"
-  }
-];
+const BUILTIN_MODELS = [{ model: "sonnet", label: "Sonnet" }, { model: "opus", label: "Opus" }] as const;
+const NO_PROVIDERS: ModelProvider[] = [];
+const modelKey = ({ providerId, model }: ModelSelection) => JSON.stringify([providerId ?? null, model]);
 
 /**
  * FloatingPromptInput component - Fixed position prompt input with model picker
@@ -211,7 +192,11 @@ const FloatingPromptInputInner = (
     disabled = false,
     embedded = false,
     defaultModel = "sonnet",
-    customModel,
+    modelSelection,
+    onModelChange,
+    providers = NO_PROVIDERS,
+    modelsLoaded = true,
+    modelsError = false,
     projectPath,
     className,
     onCancel,
@@ -221,10 +206,15 @@ const FloatingPromptInputInner = (
 ) => {
   useLanguage();
   const [prompt, setPrompt] = useState("");
-  const [selectedModel, setSelectedModel] = useState<"sonnet" | "opus">(defaultModel);
+  const [localModel, setLocalModel] = useState<ModelSelection>();
+  const activeProviders = providers.filter(provider => provider.enabled && provider.hasCredential && provider.models.length > 0);
+  const selectedModel = modelSelection ?? localModel ?? (providers.length ? initialModel(providers) : { model: defaultModel });
+  const selectedProvider = savedProviderFor(selectedModel, providers);
+  const modelUnavailable = !!selectedModel.providerId && !selectedProvider;
+  const modelPending = !modelsLoaded && !modelSelection && !localModel;
+  const canSend = !modelUnavailable && !modelPending;
   const [selectedThinkingMode, setSelectedThinkingMode] = useState<ThinkingMode>("auto");
   const [isExpanded, setIsExpanded] = useState(false);
-  const [modelPickerOpen, setModelPickerOpen] = useState(false);
   const [thinkingModePickerOpen, setThinkingModePickerOpen] = useState(false);
   const [showFilePicker, setShowFilePicker] = useState(false);
   const [filePickerQuery, setFilePickerQuery] = useState("");
@@ -700,7 +690,7 @@ const FloatingPromptInputInner = (
       return;
     }
 
-    if (prompt.trim() && !disabled) {
+    if (prompt.trim() && !disabled && canSend) {
       let finalPrompt = prompt.trim();
 
       // Append thinking phrase if not auto mode
@@ -847,7 +837,42 @@ const FloatingPromptInputInner = (
     setPrompt(newPrompt.trim());
   };
 
-  const selectedModelData = MODELS.find(m => m.id === selectedModel) || MODELS[0];
+  const renderModelPicker = (expanded: boolean) => {
+    const unavailableLabel = translate("Model unavailable");
+    const label = modelUnavailable ? unavailableLabel : modelPending ? translate("Select model")
+      : selectedProvider ? `${selectedProvider.name} / ${selectedModel.model}` : selectedModel.model === "opus" ? "Opus" : "Sonnet";
+    const title = selectedProvider ? `${selectedProvider.name} / ${selectedModel.model}`
+      : modelPending && modelsError ? translate("Could not load model provider settings.") : label;
+    const choose = (model: ModelSelection) => (onModelChange ?? setLocalModel)(model);
+    return (
+      <Select value={modelPending ? "" : modelKey(selectedModel)} onValueChange={key => {
+        const builtin = BUILTIN_MODELS.find(model => modelKey(model) === key);
+        if (builtin) return choose({ model: builtin.model });
+        for (const provider of activeProviders) {
+          const model = provider.models.find(model => modelKey({ providerId: provider.id, model }) === key);
+          if (model) return choose({ providerId: provider.id, model });
+        }
+      }}>
+        <SelectTrigger aria-label={translate("Select model")} title={title}
+          className={cn("gap-1.5 text-xs [&>span]:block [&>span]:min-w-0 [&>span]:truncate", expanded ? "w-40" : "h-9 w-28 px-2 sm:w-36")}>
+          <SelectValue placeholder={label}>{label}</SelectValue>
+        </SelectTrigger>
+        <SelectContent className="max-w-[calc(100vw-2rem)] min-w-44">
+          {modelUnavailable && <SelectItem disabled value={modelKey(selectedModel)}>{unavailableLabel}</SelectItem>}
+          <SelectGroup>
+            <SelectLabel>{translate("Built-in models")}</SelectLabel>
+            {BUILTIN_MODELS.map(model => <SelectItem key={model.model} value={modelKey(model)}>{model.label}</SelectItem>)}
+          </SelectGroup>
+          {activeProviders.map(provider => (
+            <SelectGroup key={provider.id}>
+              <SelectLabel className="truncate" title={provider.name}>{provider.name}</SelectLabel>
+              {provider.models.map(model => <SelectItem key={model} title={model} value={modelKey({ providerId: provider.id, model })}>{model}</SelectItem>)}
+            </SelectGroup>
+          ))}
+        </SelectContent>
+      </Select>
+    );
+  };
 
   return (
     <TooltipProvider>
@@ -918,57 +943,7 @@ const FloatingPromptInputInner = (
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground">{translate("Model:")}</span>
-                    {customModel ? (
-                      <span className="max-w-40 truncate text-sm font-medium" title={customModel}>{customModel}</span>
-                    ) : <Popover
-                      trigger={
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setModelPickerOpen(!modelPickerOpen)}
-                          className="gap-2"
-                        >
-                          <span className={selectedModelData.color}>
-                            {selectedModelData.icon}
-                          </span>
-                          {selectedModelData.name}
-                        </Button>
-                      }
-                      content={
-                        <div className="w-[300px] p-1">
-                          {MODELS.map((model) => (
-                            <button
-                              key={model.id}
-                              onClick={() => {
-                                setSelectedModel(model.id);
-                                setModelPickerOpen(false);
-                              }}
-                              className={cn(
-                                "w-full flex items-start gap-3 p-3 rounded-md transition-colors text-left",
-                                "hover:bg-accent",
-                                selectedModel === model.id && "bg-accent"
-                              )}
-                            >
-                              <div className="mt-0.5">
-                                <span className={model.color}>
-                                  {model.icon}
-                                </span>
-                              </div>
-                              <div className="flex-1 space-y-1">
-                                <div className="font-medium text-sm">{model.name}</div>
-                                <div className="text-xs text-muted-foreground">
-                                  {translate(model.description)}
-                                </div>
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      }
-                      open={modelPickerOpen}
-                      onOpenChange={setModelPickerOpen}
-                      align="start"
-                      side="top"
-                    />}
+                    {renderModelPicker(true)}
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -1043,7 +1018,7 @@ const FloatingPromptInputInner = (
                   >
                     <Button
                       onClick={handleSend}
-                      disabled={!prompt.trim() || disabled}
+                      disabled={!prompt.trim() || disabled || !canSend}
                       size="default"
                       className="min-w-[60px]"
                     >
@@ -1089,78 +1064,7 @@ const FloatingPromptInputInner = (
             <div className="flex items-end gap-2">
               {/* Model & Thinking Mode Selectors - Left side, fixed at bottom */}
               <div className="flex items-center gap-1 shrink-0 mb-1">
-                {customModel ? (
-                  <TooltipSimple content={customModel} side="top">
-                    <span className="flex h-9 max-w-28 items-center gap-1.5 px-2 text-xs font-medium">
-                      <Zap className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
-                      <span className="truncate">{customModel}</span>
-                    </span>
-                  </TooltipSimple>
-                ) : <Popover
-                  trigger={
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <motion.div
-                          whileTap={{ scale: 0.97 }}
-                            transition={{ duration: 0.15 }}
-                          >
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              disabled={disabled}
-                              className="h-9 px-2 hover:bg-accent/50 gap-1"
-                            >
-                              <span className={selectedModelData.color}>
-                                {selectedModelData.icon}
-                              </span>
-                              <span className="text-[10px] font-bold opacity-70">
-                                {selectedModelData.shortName}
-                              </span>
-                              <ChevronUp className="h-3 w-3 ml-0.5 opacity-50" />
-                            </Button>
-                          </motion.div>
-                        </TooltipTrigger>
-                        <TooltipContent side="top">
-                          <p className="text-xs font-medium">{selectedModelData.name}</p>
-                          <p className="text-xs text-muted-foreground">{translate(selectedModelData.description)}</p>
-                        </TooltipContent>
-                      </Tooltip>
-                  }
-                content={
-                  <div className="w-[300px] p-1">
-                    {MODELS.map((model) => (
-                      <button
-                        key={model.id}
-                        onClick={() => {
-                          setSelectedModel(model.id);
-                          setModelPickerOpen(false);
-                        }}
-                        className={cn(
-                          "w-full flex items-start gap-3 p-3 rounded-md transition-colors text-left",
-                          "hover:bg-accent",
-                          selectedModel === model.id && "bg-accent"
-                        )}
-                      >
-                        <div className="mt-0.5">
-                          <span className={model.color}>
-                            {model.icon}
-                          </span>
-                        </div>
-                        <div className="flex-1 space-y-1">
-                          <div className="font-medium text-sm">{model.name}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {translate(model.description)}
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                }
-                open={modelPickerOpen}
-                onOpenChange={setModelPickerOpen}
-                align="start"
-                side="top"
-              />}
+                {renderModelPicker(false)}
 
                 <Popover
                   trigger={
@@ -1284,7 +1188,7 @@ const FloatingPromptInputInner = (
                     >
                       <Button
                         onClick={isLoading ? onCancel : handleSend}
-                        disabled={isLoading ? false : (!prompt.trim() || disabled)}
+                        disabled={isLoading ? false : (!prompt.trim() || disabled || !canSend)}
                         variant={isLoading ? "destructive" : prompt.trim() ? "default" : "ghost"}
                         size="icon"
                         className={cn(

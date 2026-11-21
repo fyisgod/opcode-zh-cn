@@ -256,6 +256,8 @@ const TabPanel: React.FC<TabPanelProps> = ({ tab, isActive }) => {
             <ClaudeCodeSession
               session={tab.sessionData} // Pass the full session object if available
               initialProjectPath={tab.initialProjectPath}
+              modelSelection={tab.modelSelection}
+              onModelChange={modelSelection => updateTab(tab.id, { modelSelection })}
               isActive={isActive}
               onStreamingChange={onStreamingChange}
               onSessionIdentified={(id, prompt) => {

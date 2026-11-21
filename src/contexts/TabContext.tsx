@@ -3,6 +3,7 @@ import { TabPersistenceService } from '@/services/tabPersistence';
 import { SessionPersistenceService } from '@/services/sessionPersistence';
 import { api } from '@/lib/api';
 import { buildProjectPathIndex, resolveRestoredProjectPath } from '@/lib/projectPaths';
+import type { ModelSelection } from '@/lib/modelProvider';
 
 export interface Tab {
   id: string;
@@ -14,6 +15,7 @@ export interface Tab {
   agentData?: any; // for agent-execution tabs
   claudeFileId?: string; // for claude-file tabs
   initialProjectPath?: string; // for chat tabs
+  modelSelection?: ModelSelection; // for chat tabs
   projectPath?: string; // for agent-execution tabs
   status: 'active' | 'idle' | 'running' | 'complete' | 'error';
   hasUnsavedChanges: boolean;

@@ -1200,6 +1200,7 @@ pub async fn execute_claude_code(
     project_path: String,
     prompt: String,
     model: String,
+    provider_id: Option<String>,
 ) -> Result<(), String> {
     log::info!(
         "Starting new Claude Code session in: {} with model: {}",
@@ -1207,7 +1208,7 @@ pub async fn execute_claude_code(
         model
     );
 
-    run_claude_prompt(app, project_path, prompt, model, &[]).await
+    run_claude_prompt(app, project_path, prompt, model, provider_id, &[]).await
 }
 
 /// Continue an existing Claude Code conversation with streaming output
@@ -1217,6 +1218,7 @@ pub async fn continue_claude_code(
     project_path: String,
     prompt: String,
     model: String,
+    provider_id: Option<String>,
 ) -> Result<(), String> {
     log::info!(
         "Continuing Claude Code conversation in: {} with model: {}",
@@ -1224,7 +1226,7 @@ pub async fn continue_claude_code(
         model
     );
 
-    run_claude_prompt(app, project_path, prompt, model, &["-c"]).await
+    run_claude_prompt(app, project_path, prompt, model, provider_id, &["-c"]).await
 }
 
 /// Resume an existing Claude Code session by ID with streaming output
@@ -1235,6 +1237,7 @@ pub async fn resume_claude_code(
     session_id: String,
     prompt: String,
     model: String,
+    provider_id: Option<String>,
 ) -> Result<(), String> {
     log::info!(
         "Resuming Claude Code session: {} in: {} with model: {}",
@@ -1243,7 +1246,7 @@ pub async fn resume_claude_code(
         model
     );
 
-    run_claude_prompt(app, project_path, prompt, model, &["--resume", &session_id]).await
+    run_claude_prompt(app, project_path, prompt, model, provider_id, &["--resume", &session_id]).await
 }
 
 async fn run_claude_prompt(
@@ -1251,17 +1254,17 @@ async fn run_claude_prompt(
     project_path: String,
     prompt: String,
     model: String,
+    provider_id: Option<String>,
     session_args: &[&str],
 ) -> Result<(), String> {
     let claude_path = find_claude_binary(&app)?;
     let mut cmd = create_command_with_env(&claude_path);
-    let (model, provider_bridge) = match super::model_provider::ActiveProvider::load(&app)? {
-        Some(provider) => {
-            super::model_provider::check_cli_support(&claude_path).await?;
-            let bridge = provider.configure(&mut cmd).await?;
-            (provider.model, bridge)
-        }
-        None => (model, None),
+    let provider_bridge = if let Some(id) = provider_id {
+        let provider = super::model_provider::ActiveProvider::load(&app, &id, &model)?;
+        super::model_provider::check_cli_support(&claude_path).await?;
+        provider.configure(&mut cmd).await?
+    } else {
+        None
     };
     cmd.args(session_args)
         .args([

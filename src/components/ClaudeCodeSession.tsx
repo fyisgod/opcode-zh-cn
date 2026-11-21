@@ -1,5 +1,5 @@
 import { t as translate, useLanguage } from "@/lib/i18n";
-import { useCustomModel } from "@/lib/modelProvider";
+import { initialModel, savedProviderFor, useModelProviders, type ModelSelection } from "@/lib/modelProvider";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -50,6 +50,8 @@ interface ClaudeCodeSessionProps {
    */
   onBack?: () => void;
   isActive?: boolean;
+  modelSelection?: ModelSelection;
+  onModelChange?: (selection: ModelSelection) => void;
   onSessionIdentified?: (id: string, prompt: string) => void;
   /**
    * Callback to open hooks configuration
@@ -80,19 +82,21 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
   initialProjectPath = "",
   className,
   isActive = true,
+  modelSelection,
+  onModelChange,
   onSessionIdentified,
   onStreamingChange,
   onProjectPathChange,
 }) => {
   useLanguage();
-  const customModel = useCustomModel();
+  const { providers, loaded: modelsLoaded, error: modelsError } = useModelProviders();
+  const [pendingModel, setPendingModel] = useState<ModelSelection>();
   const [projectPath] = useState(initialProjectPath || session?.project_path || "");
   const [messages, setMessages] = useState<ClaudeStreamMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rawJsonlOutput, setRawJsonlOutput] = useState<string[]>([]);
   const [copyPopoverOpen, setCopyPopoverOpen] = useState(false);
-  const [isFirstPrompt, setIsFirstPrompt] = useState(!session);
   const [totalTokens, setTotalTokens] = useState(0);
   const [extractedSessionInfo, setExtractedSessionInfo] = useState<{ sessionId: string; projectId: string } | null>(null);
   const [claudeSessionId, setClaudeSessionId] = useState<string | null>(null);
@@ -105,7 +109,8 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
   const [forkSessionName, setForkSessionName] = useState("");
   
   // Queued prompts state
-  const [queuedPrompts, setQueuedPrompts] = useState<Array<{ id: string; prompt: string; model: "sonnet" | "opus" }>>([]);
+  type QueuedPrompt = { id: string; prompt: string; selection: ModelSelection; label: string };
+  const [queuedPrompts, setQueuedPrompts] = useState<QueuedPrompt[]>([]);
   
   // New state for preview feature
   const [showPreview, setShowPreview] = useState(false);
@@ -121,7 +126,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
   const unlistenRefs = useRef<UnlistenFn[]>([]);
   const hasActiveSessionRef = useRef(false);
   const floatingPromptRef = useRef<FloatingPromptInputRef>(null);
-  const queuedPromptsRef = useRef<Array<{ id: string; prompt: string; model: "sonnet" | "opus" }>>([]);
+  const queuedPromptsRef = useRef<QueuedPrompt[]>([]);
   const isMountedRef = useRef(true);
   const isListeningRef = useRef(false);
   const sessionStartTime = useRef<number>(Date.now());
@@ -176,6 +181,15 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
     }
     return null;
   }, [session, extractedSessionInfo, projectPath]);
+
+  const selectModel = (selection: ModelSelection) => {
+    const current = modelSelection ?? initialModel(providers);
+    if ((effectiveSession || hasActiveSessionRef.current) && current.providerId !== selection.providerId) {
+      setPendingModel(selection);
+    } else {
+      onModelChange?.(selection);
+    }
+  };
 
   // Filter out messages that shouldn't be displayed
   const displayableMessages = useMemo(() => {
@@ -348,7 +362,6 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
       setRawJsonlOutput(history.map(h => JSON.stringify(h)));
       
       // After loading history, we're continuing a conversation
-      setIsFirstPrompt(false);
       
       // Scroll to bottom after loading history
       setTimeout(() => {
@@ -467,7 +480,10 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
 
   // Project path selection handled by parent tab controls
 
-  const handleSendPrompt = async (prompt: string, model: "sonnet" | "opus") => {
+  const handleSendPrompt = async (prompt: string, selection: ModelSelection, resumeId = effectiveSession?.id) => {
+    const { providerId } = selection;
+    // Keep custom model identifiers out of analytics.
+    const model = providerId ? "custom" : selection.model;
     console.log('[ClaudeCodeSession] handleSendPrompt called with:', { prompt, model, projectPath, claudeSessionId, effectiveSession });
     
     if (!projectPath) {
@@ -476,11 +492,13 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
     }
 
     // If already loading, queue the prompt
-    if (isLoading) {
+    if (hasActiveSessionRef.current) {
+      const provider = savedProviderFor(selection, providers);
       const newPrompt = {
         id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         prompt,
-        model
+        selection,
+        label: provider ? `${provider.name} / ${selection.model}` : selection.model === "opus" ? "Opus" : "Sonnet",
       };
       setQueuedPrompts(prev => [...prev, newPrompt]);
       return;
@@ -520,7 +538,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
 
         console.log('[ClaudeCodeSession] Setting up generic event listeners first');
 
-        let currentSessionId: string | null = claudeSessionId || effectiveSession?.id || null;
+        let currentSessionId: string | null = resumeId ?? null;
 
         // The backend emits every line twice: first on the session-scoped
         // channel, then on the generic one. While switching from generic to
@@ -692,7 +710,10 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
         }
 
         // Helper to handle completion events (both generic and scoped)
+        let completed = false;
         const processComplete = async (success: boolean) => {
+          if (completed) return;
+          completed = true;
           setIsLoading(false);
           hasActiveSessionRef.current = false;
           isListeningRef.current = false; // Reset listening state
@@ -786,7 +807,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
             
             // Small delay to ensure UI updates
             setTimeout(() => {
-              handleSendPrompt(nextPrompt.prompt, nextPrompt.model);
+              void handleSendPrompt(nextPrompt.prompt, nextPrompt.selection, currentSessionId ?? undefined);
             }, 100);
           }
         };
@@ -865,17 +886,16 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
         });
 
         // Execute the appropriate command
-        if (effectiveSession && !isFirstPrompt) {
-          console.log('[ClaudeCodeSession] Resuming session:', effectiveSession.id);
-          trackEvent.sessionResumed(effectiveSession.id);
+        if (resumeId) {
+          console.log('[ClaudeCodeSession] Resuming session:', resumeId);
+          trackEvent.sessionResumed(resumeId);
           trackEvent.modelSelected(model);
-          await api.resumeClaudeCode(projectPath, effectiveSession.id, prompt, model);
+          await api.resumeClaudeCode(projectPath, resumeId, prompt, selection.model, providerId);
         } else {
           console.log('[ClaudeCodeSession] Starting new session');
-          setIsFirstPrompt(false);
           trackEvent.sessionCreated(model, 'prompt_input');
           trackEvent.modelSelected(model);
-          await api.executeClaudeCode(projectPath, prompt, model);
+          await api.executeClaudeCode(projectPath, prompt, selection.model, providerId);
         }
       }
     } catch (err) {
@@ -886,6 +906,9 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
       setError(detail ? translate("Failed to send prompt: {v1}", { v1: translate(detail) }) : translate("Failed to send prompt"));
       setIsLoading(false);
       hasActiveSessionRef.current = false;
+      isListeningRef.current = false;
+      unlistenRefs.current.forEach(unlisten => unlisten());
+      unlistenRefs.current = [];
     }
   };
 
@@ -1416,8 +1439,8 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-xs font-medium text-muted-foreground">#{index + 1}</span>
-                          <span className="truncate text-xs px-1.5 py-0.5 bg-primary/10 text-primary rounded" title={customModel ?? undefined}>
-                            {customModel ?? (queuedPrompt.model === "opus" ? "Opus" : "Sonnet")}
+                          <span className="truncate text-xs px-1.5 py-0.5 bg-primary/10 text-primary rounded" title={queuedPrompt.label}>
+                            {queuedPrompt.label}
                           </span>
                         </div>
                         <p className="text-sm line-clamp-2 break-words">{queuedPrompt.prompt}</p>
@@ -1541,8 +1564,15 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
             <FloatingPromptInput
               ref={floatingPromptRef}
               embedded
-              customModel={customModel}
-              onSend={handleSendPrompt}
+              modelSelection={modelSelection}
+              onModelChange={selectModel}
+              providers={providers}
+              modelsLoaded={modelsLoaded}
+              modelsError={modelsError}
+              onSend={(prompt, selection) => {
+                if (!modelSelection) onModelChange?.(selection);
+                void handleSendPrompt(prompt, selection);
+              }}
               onCancel={handleCancelExecution}
               isLoading={isLoading}
               disabled={!projectPath}
@@ -1738,6 +1768,24 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
           </DialogContent>
         </Dialog>
       )}
+
+      <Dialog open={!!pendingModel} onOpenChange={open => { if (!open) setPendingModel(undefined); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{translate("Switch provider?")}</DialogTitle>
+            <DialogDescription>{translate("The next message may send this conversation’s history to {name}.", {
+              name: (pendingModel && savedProviderFor(pendingModel, providers)?.name) ?? translate("your default Claude Code provider"),
+            })}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPendingModel(undefined)}>{translate("Cancel")}</Button>
+            <Button onClick={() => {
+              if (pendingModel) onModelChange?.(pendingModel);
+              setPendingModel(undefined);
+            }}>{translate("Switch provider")}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Slash Commands Settings Dialog */}
       {showSlashCommandsSettings && (

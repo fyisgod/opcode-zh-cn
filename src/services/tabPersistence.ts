@@ -17,6 +17,7 @@ interface SerializedTab {
   agentRunId?: string;
   claudeFileId?: string;
   initialProjectPath?: string;
+  modelSelection?: Tab['modelSelection'];
   projectPath?: string;
   status: Tab['status'];
   hasUnsavedChanges: boolean;
@@ -75,6 +76,7 @@ export class TabPersistenceService {
         agentRunId: tab.agentRunId,
         claudeFileId: tab.claudeFileId,
         initialProjectPath: tab.initialProjectPath,
+        modelSelection: tab.modelSelection,
         projectPath: tab.projectPath,
         status: tab.status === 'running' ? 'idle' : tab.status, // Reset running status
         hasUnsavedChanges: false, // Reset unsaved changes

@@ -1,4 +1,4 @@
-use std::{fs, io::Write, net::IpAddr, path::PathBuf};
+use std::{collections::HashSet, fs, io::Write, net::IpAddr, path::PathBuf, sync::Mutex};
 
 use super::provider_bridge::ProviderBridge;
 use reqwest::Url;
@@ -60,13 +60,21 @@ pub(super) enum Protocol {
 
 #[derive(Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct Provider {
+struct ProviderConnection {
     enabled: bool,
     base_url: String,
-    model: String,
     auth: Auth,
     #[serde(default)]
     protocol: Protocol,
+}
+
+#[derive(Default, Deserialize, Serialize)]
+struct Provider {
+    id: String,
+    name: String,
+    models: Vec<String>,
+    #[serde(flatten)]
+    connection: ProviderConnection,
 }
 
 #[derive(Default, Deserialize, Serialize)]
@@ -74,6 +82,59 @@ struct SavedProvider {
     #[serde(flatten)]
     provider: Provider,
     credential: String,
+}
+
+#[derive(Default, Deserialize, Serialize)]
+struct Registry {
+    providers: Vec<SavedProvider>,
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum ProviderFile {
+    Registry(Registry),
+    Legacy {
+        #[serde(flatten)]
+        connection: ProviderConnection,
+        model: String,
+        credential: String,
+    },
+}
+
+const LEGACY_PROVIDER_ID: &str = "legacy-provider";
+static REGISTRY_WRITE: Mutex<()> = Mutex::new(());
+
+impl ProviderFile {
+    fn into_registry(self) -> Registry {
+        match self {
+            Self::Registry(registry) => registry,
+            Self::Legacy {
+                connection,
+                model,
+                credential,
+            } => {
+                let name = Url::parse(&connection.base_url)
+                    .ok()
+                    .and_then(|url| url.host_str().map(str::to_owned))
+                    .unwrap_or_else(|| "Custom provider".into());
+                Registry {
+                    providers: vec![SavedProvider {
+                        provider: Provider {
+                            id: LEGACY_PROVIDER_ID.into(),
+                            name,
+                            models: if model.is_empty() {
+                                Vec::new()
+                            } else {
+                                vec![model]
+                            },
+                            connection,
+                        },
+                        credential,
+                    }],
+                }
+            }
+        }
+    }
 }
 
 #[derive(Serialize)]
@@ -108,11 +169,12 @@ fn config_path(app: &AppHandle) -> Result<PathBuf, String> {
         .join("model-provider.json"))
 }
 
-fn load(app: &AppHandle) -> Result<SavedProvider, String> {
-    match fs::read(config_path(app)?) {
-        Ok(content) => serde_json::from_slice(&content)
+fn load(path: &std::path::Path) -> Result<Registry, String> {
+    match fs::read(path) {
+        Ok(content) => serde_json::from_slice::<ProviderFile>(&content)
+            .map(ProviderFile::into_registry)
             .map_err(|_| "Invalid model provider configuration".to_string()),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(SavedProvider::default()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Registry::default()),
         Err(e) => Err(format!("Could not read model provider configuration: {e}")),
     }
 }
@@ -139,68 +201,137 @@ fn normalized_url(value: &str) -> Result<String, String> {
     Ok(url.as_str().trim_end_matches('/').to_string())
 }
 
+fn persist(path: &std::path::Path, registry: &Registry) -> Result<(), String> {
+    let dir = path
+        .parent()
+        .ok_or("Missing model provider configuration directory")?;
+    fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    let mut temp = tempfile::NamedTempFile::new_in(dir).map_err(|e| e.to_string())?;
+    serde_json::to_writer(temp.as_file_mut(), registry).map_err(|e| e.to_string())?;
+    temp.flush().map_err(|e| e.to_string())?;
+    temp.persist(path).map_err(|e| e.error.to_string())?;
+    Ok(())
+}
+
+impl Registry {
+    fn status(self) -> Vec<ProviderStatus> {
+        self.providers.into_iter().map(Into::into).collect()
+    }
+
+    fn upsert(&mut self, update: ProviderUpdate) -> Result<String, String> {
+        let mut provider = update.provider;
+        let index = if provider.id.is_empty() {
+            provider.id = uuid::Uuid::new_v4().to_string();
+            None
+        } else {
+            Some(
+                self.providers
+                    .iter()
+                    .position(|saved| saved.provider.id == provider.id)
+                    .ok_or("This model provider no longer exists.")?,
+            )
+        };
+
+        provider.name = provider.name.trim().to_string();
+        if provider.name.is_empty() || provider.name.chars().any(char::is_control) {
+            return Err("Enter a provider name.".into());
+        }
+        let connection = &mut provider.connection;
+        connection.base_url = connection.base_url.trim().to_string();
+        if !connection.base_url.is_empty() || connection.enabled {
+            connection.base_url = normalized_url(&connection.base_url)?;
+            super::provider_bridge::validate_endpoint(connection.protocol, &connection.base_url)?;
+        }
+        let mut seen = HashSet::new();
+        provider.models.retain_mut(|model| {
+            *model = model.trim().to_string();
+            !model.is_empty() && seen.insert(model.clone())
+        });
+        if (connection.enabled && provider.models.is_empty())
+            || provider.models.iter().any(|model| {
+                model.starts_with('-') || model.chars().any(|c| c.is_whitespace() || c.is_control())
+            })
+        {
+            return Err("Enter valid model IDs, one per line.".into());
+        }
+        let credential = match update.credential {
+            Some(value) if value.is_empty() => String::new(),
+            Some(value) => {
+                if value.bytes().any(|b| !(0x21..=0x7e).contains(&b)) {
+                    return Err("Enter a valid API credential.".into());
+                }
+                protect_credential(&value)?
+            }
+            None => index
+                .and_then(|i| {
+                    let previous = &self.providers[i];
+                    let saved = &previous.provider.connection;
+                    (connection.base_url == saved.base_url
+                        && connection.auth == saved.auth
+                        && connection.protocol == saved.protocol)
+                        .then(|| previous.credential.clone())
+                })
+                .unwrap_or_default(),
+        };
+        if connection.enabled && credential.is_empty() {
+            return Err(
+                "Enter an API credential for this endpoint and authentication method.".into(),
+            );
+        }
+
+        let id = provider.id.clone();
+        let saved = SavedProvider {
+            provider,
+            credential,
+        };
+        if let Some(index) = index {
+            self.providers[index] = saved;
+        } else {
+            self.providers.push(saved);
+        }
+        Ok(id)
+    }
+}
+
+#[derive(Serialize)]
+pub struct ProviderSaveResult {
+    id: String,
+    providers: Vec<ProviderStatus>,
+}
+
 #[tauri::command]
-pub fn get_model_provider(app: AppHandle) -> Result<ProviderStatus, String> {
-    load(&app).map(Into::into)
+pub fn get_model_providers(app: AppHandle) -> Result<Vec<ProviderStatus>, String> {
+    load(&config_path(&app)?).map(Registry::status)
 }
 
 #[tauri::command]
 pub fn save_model_provider(
     app: AppHandle,
     update: ProviderUpdate,
-) -> Result<ProviderStatus, String> {
-    let previous = load(&app)?;
-    let mut provider = update.provider;
-    provider.base_url = provider.base_url.trim().to_string();
-    provider.model = provider.model.trim().to_string();
-
-    if !provider.base_url.is_empty() || provider.enabled {
-        provider.base_url = normalized_url(&provider.base_url)?;
-        super::provider_bridge::validate_endpoint(provider.protocol, &provider.base_url)?;
-    }
-    if (provider.enabled && provider.model.is_empty())
-        || provider.model.starts_with('-')
-        || provider
-            .model
-            .chars()
-            .any(|c| c.is_whitespace() || c.is_control())
-    {
-        return Err("Enter a valid model ID.".into());
-    }
-    let credential = match update.credential {
-        Some(value) if value.is_empty() => String::new(),
-        Some(value) => {
-            if value.bytes().any(|b| !(0x21..=0x7e).contains(&b)) {
-                return Err("Enter a valid API credential.".into());
-            }
-            protect_credential(&value)?
-        }
-        None if provider.base_url == previous.provider.base_url
-            && provider.auth == previous.provider.auth
-            && provider.protocol == previous.provider.protocol =>
-        {
-            previous.credential
-        }
-        None => String::new(),
-    };
-    if provider.enabled && credential.is_empty() {
-        return Err("Enter an API credential for this endpoint and authentication method.".into());
-    }
-
-    let saved = SavedProvider {
-        provider,
-        credential,
-    };
+) -> Result<ProviderSaveResult, String> {
+    let _write = REGISTRY_WRITE
+        .lock()
+        .map_err(|_| "Could not save model provider settings.")?;
     let path = config_path(&app)?;
-    let dir = path
-        .parent()
-        .ok_or("Missing model provider configuration directory")?;
-    fs::create_dir_all(dir).map_err(|e| e.to_string())?;
-    let mut temp = tempfile::NamedTempFile::new_in(dir).map_err(|e| e.to_string())?;
-    serde_json::to_writer(temp.as_file_mut(), &saved).map_err(|e| e.to_string())?;
-    temp.flush().map_err(|e| e.to_string())?;
-    temp.persist(path).map_err(|e| e.error.to_string())?;
-    Ok(saved.into())
+    let mut registry = load(&path)?;
+    let id = registry.upsert(update)?;
+    persist(&path, &registry)?;
+    Ok(ProviderSaveResult {
+        id,
+        providers: registry.status(),
+    })
+}
+
+#[tauri::command]
+pub fn remove_model_provider(app: AppHandle, id: String) -> Result<Vec<ProviderStatus>, String> {
+    let _write = REGISTRY_WRITE
+        .lock()
+        .map_err(|_| "Could not save model provider settings.")?;
+    let path = config_path(&app)?;
+    let mut registry = load(&path)?;
+    registry.providers.retain(|saved| saved.provider.id != id);
+    persist(&path, &registry)?;
+    Ok(registry.status())
 }
 
 pub(crate) struct ActiveProvider {
@@ -212,24 +343,33 @@ pub(crate) struct ActiveProvider {
 }
 
 impl ActiveProvider {
-    pub(crate) fn load(app: &AppHandle) -> Result<Option<Self>, String> {
-        let SavedProvider {
-            provider,
-            credential,
-        } = load(app)?;
-        if !provider.enabled {
-            return Ok(None);
-        }
-        if credential.is_empty() || provider.model.is_empty() {
-            return Err("Incomplete model provider configuration".into());
-        }
-        Ok(Some(Self {
-            base_url: normalized_url(&provider.base_url)?,
-            model: provider.model,
-            auth: provider.auth,
-            protocol: provider.protocol,
-            credential: unprotect_credential(&credential)?,
-        }))
+    pub(crate) fn load(app: &AppHandle, id: &str, model: &str) -> Result<Self, String> {
+        Self::resolve(load(&config_path(app)?)?, id, model)
+    }
+
+    fn resolve(registry: Registry, id: &str, model: &str) -> Result<Self, String> {
+        let saved = registry
+            .providers
+            .into_iter()
+            .find(|saved| {
+                saved.provider.id == id
+                    && saved.provider.connection.enabled
+                    && !saved.credential.is_empty()
+                    && saved
+                        .provider
+                        .models
+                        .iter()
+                        .any(|candidate| candidate == model)
+            })
+            .ok_or("The selected model is no longer available.")?;
+        let connection = saved.provider.connection;
+        Ok(Self {
+            base_url: normalized_url(&connection.base_url)?,
+            model: model.to_owned(),
+            auth: connection.auth,
+            protocol: connection.protocol,
+            credential: unprotect_credential(&saved.credential)?,
+        })
     }
 
     pub(super) async fn configure(
@@ -415,6 +555,116 @@ mod tests {
         .unwrap();
         assert_eq!(value["hasCredential"], true);
         assert!(value.get("credential").is_none());
+    }
+
+    fn update(id: &str, url: &str, models: &[&str], credential: Option<&str>) -> ProviderUpdate {
+        ProviderUpdate {
+            provider: Provider {
+                id: id.into(),
+                name: "Test provider".into(),
+                models: models.iter().map(|model| model.to_string()).collect(),
+                connection: ProviderConnection {
+                    enabled: true,
+                    base_url: url.into(),
+                    auth: Auth::Bearer,
+                    protocol: Protocol::Anthropic,
+                },
+            },
+            credential: credential.map(str::to_owned),
+        }
+    }
+
+    #[test]
+    fn migrates_legacy_provider_without_changing_its_credential() {
+        let legacy: ProviderFile = serde_json::from_value(serde_json::json!({
+            "enabled": true, "baseUrl": "https://legacy.example/v1", "model": "legacy-model",
+            "auth": "apiKey", "credential": "opaque-encrypted-credential"
+        }))
+        .unwrap();
+        let mut registry = legacy.into_registry();
+        let saved = &registry.providers[0];
+        assert_eq!(saved.provider.id, LEGACY_PROVIDER_ID);
+        assert_eq!(saved.provider.name, "legacy.example");
+        assert_eq!(saved.provider.models, ["legacy-model"]);
+        assert!(saved.provider.connection.enabled);
+        assert_eq!(saved.provider.connection.protocol, Protocol::Anthropic);
+        assert_eq!(saved.credential, "opaque-encrypted-credential");
+
+        registry
+            .upsert(update(
+                "",
+                "https://second.example",
+                &["second-model"],
+                Some("second-key"),
+            ))
+            .unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("model-provider.json");
+        persist(&path, &registry).unwrap();
+        let stored = load(&path).unwrap();
+        assert_eq!(stored.providers.len(), 2);
+        assert_eq!(
+            stored.providers[0].credential,
+            "opaque-encrypted-credential"
+        );
+    }
+
+    #[test]
+    fn uses_the_selected_provider_and_model_even_with_duplicate_model_ids() {
+        let mut registry = Registry::default();
+        let a = registry
+            .upsert(update(
+                "",
+                "https://a.example",
+                &["same", " alternate ", "same"],
+                Some("key-a"),
+            ))
+            .unwrap();
+        let b = registry
+            .upsert(update("", "https://b.example", &["same"], Some("key-b")))
+            .unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("model-provider.json");
+        persist(&path, &registry).unwrap();
+        let resolve = |id, model| ActiveProvider::resolve(load(&path).unwrap(), id, model);
+        for (id, model, endpoint, key) in [
+            (&a, "same", "https://a.example", "key-a"),
+            (&a, "alternate", "https://a.example", "key-a"),
+            (&b, "same", "https://b.example", "key-b"),
+        ] {
+            let active = resolve(id, model).unwrap();
+            assert_eq!(active.base_url, endpoint);
+            assert_eq!(active.credential, key);
+            assert_eq!(active.model, model);
+        }
+        assert_eq!(registry.providers[0].provider.models, ["same", "alternate"]);
+        assert!(resolve(&b, "alternate").is_err());
+        let mut disabled = update(&a, "https://a.example", &["same"], None);
+        disabled.provider.connection.enabled = false;
+        registry.upsert(disabled).unwrap();
+        assert!(ActiveProvider::resolve(registry, &a, "same").is_err());
+    }
+
+    #[test]
+    fn keeps_keys_when_editing_models_but_not_when_changing_endpoints() {
+        let mut registry = Registry::default();
+        let id = registry
+            .upsert(update(
+                "",
+                "https://a.example",
+                &["first"],
+                Some("first-key"),
+            ))
+            .unwrap();
+        registry
+            .upsert(update(&id, "https://a.example", &["second"], None))
+            .unwrap();
+        assert!(registry
+            .upsert(update(&id, "https://b.example", &["second"], None))
+            .is_err());
+        let active = ActiveProvider::resolve(registry, &id, "second").unwrap();
+        assert_eq!(active.base_url, "https://a.example");
+        assert_eq!(active.credential, "first-key");
     }
 
     #[test]

@@ -116,7 +116,7 @@ Think of opcode as your command center for Claude Code - bridging the gap betwee
 
 ### Custom Model Provider
 
-In the desktop app, open **Settings → Model provider** and enable **Custom provider**. Select the protocol your provider documents, then enter its base URL, model ID, authentication method, and API credential. Choose **Save provider** to apply the change.
+In the desktop app, open **Settings → Model provider → Add provider**. Give the provider a name, select its API protocol, and enter its base URL, authentication method, and API credential. Enter one model ID per line and save. Each provider can be enabled, edited, or removed independently. Existing single-provider settings are read as the first provider without re-entering the credential.
 
 | API protocol | URL example | Routing |
 | --- | --- | --- |
@@ -129,9 +129,9 @@ For adapted protocols, a complete endpoint URL also works. Use HTTPS except for 
 
 The local adapter supports streamed text, image input, and client-side function calls on models that accept them. It does not expose vendor-hosted tools. Token counts are estimates when the upstream API does not supply them. Opaque tool reasoning metadata is replayed within a single CLI run but is not saved as session history. Gemini uses the OpenAI-compatible interface, not the native `generateContent` interface.
 
-Use Claude Code 2.1.329 or later. There is one active provider for desktop chats. It takes effect on the next prompt, including when continuing or resuming; the provider may receive prior conversation history. Disabling it restores your normal Claude Code configuration. Terminal sessions, CC Agents, and web mode are unchanged.
+Use Claude Code 2.1.329 or later for custom providers. Pick a model from the conversation's model menu. The menu groups enabled models by provider and also offers the built-in Sonnet and Opus options. A selection is scoped to the chat tab; queued prompts keep the selection they had when queued. Continuing or resuming after switching providers can send prior conversation history to the new provider. If a selected model is removed or disabled, select a replacement before sending. Terminal sessions, CC Agents, and web mode are unchanged.
 
-Opcode stores the configuration separately from `~/.claude/settings.json`. Windows protects the saved credential with DPAPI. On Unix, the configuration file is owner-readable and stores the credential without encryption. The adapter listens only on loopback, uses a per-run token, and does not give the upstream credential to the CLI. To erase the saved credential, choose **Disable and remove credential**.
+Opcode stores the configuration separately from `~/.claude/settings.json`. Windows protects saved credentials with DPAPI. On Unix, the configuration file is owner-readable and stores credentials without encryption. The adapter listens only on loopback, uses a per-run token, and does not give the upstream credential to the CLI. Removing a provider also removes its saved credential.
 
 ### Managing Projects
 
