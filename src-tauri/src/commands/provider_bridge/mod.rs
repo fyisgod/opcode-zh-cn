@@ -120,7 +120,7 @@ impl ProviderBridge {
     }
 }
 
-fn endpoint(protocol: Protocol, base: &str) -> Result<Url, String> {
+pub(super) fn endpoint(protocol: Protocol, base: &str) -> Result<Url, String> {
     let mut url = Url::parse(base).map_err(|_| "Enter a valid base URL.")?;
     let resource = match protocol {
         Protocol::OpenAiChat | Protocol::Gemini => "/chat/completions",

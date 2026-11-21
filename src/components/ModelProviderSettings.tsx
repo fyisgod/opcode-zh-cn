@@ -1,14 +1,14 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Loader2, Plus, Save, Trash2 } from "lucide-react";
+import { Download, Loader2, Pencil, Plus, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
+import { ModelCatalog, ModelEditor } from "@/components/ProviderModelDialogs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { t } from "@/lib/i18n";
-import { loadModelProviders, removeModelProvider, saveModelProvider, useModelProviders, type ModelProvider, type ProviderProtocol } from "@/lib/modelProvider";
+import { t, getLanguage } from "@/lib/i18n";
+import { fetchProviderModels, loadModelProviders, reasoningEffortLabels, removeModelProvider, saveModelProvider, useModelProviders, type ModelProvider, type ProviderModel, type ProviderProtocol } from "@/lib/modelProvider";
 import { cn } from "@/lib/utils";
 
 const protocols: Record<ProviderProtocol, { label: string; address: string }> = {
@@ -26,7 +26,8 @@ export function ModelProviderSettings() {
   const { providers, loaded, error: loadError } = useModelProviders();
   const [provider, setProvider] = useState<ModelProvider>(blankProvider);
   const [lastSaved, setLastSaved] = useState<ModelProvider | null>(null);
-  const [modelsText, setModelsText] = useState("");
+  const [editingModel, setEditingModel] = useState<number | "new" | null>(null);
+  const [catalogRequest, setCatalogRequest] = useState<Promise<ProviderModel[]>>();
   const [credential, setCredential] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +37,8 @@ export function ModelProviderSettings() {
   const select = (value?: ModelProvider) => {
     setProvider(value ?? blankProvider);
     setLastSaved(value ?? null);
-    setModelsText(value?.models.join("\n") ?? "");
+    setEditingModel(null);
+    setCatalogRequest(undefined);
     setCredential("");
     setError(null);
     setSaved(false);
@@ -61,7 +63,7 @@ export function ModelProviderSettings() {
     try {
       const stored = await saveModelProvider({
         id: provider.id, name: provider.name, enabled: provider.enabled, baseUrl: provider.baseUrl,
-        models: modelsText.split(/\r?\n/), auth: provider.auth, protocol: provider.protocol,
+        models: provider.models, auth: provider.auth, protocol: provider.protocol,
         credential: credential.trim() || undefined,
       });
       select(stored);
@@ -103,6 +105,12 @@ export function ModelProviderSettings() {
 
   const canReuseCredential = lastSaved?.hasCredential && provider.protocol === lastSaved.protocol
     && provider.baseUrl.trim().replace(/\/+$/, "") === lastSaved.baseUrl && provider.auth === lastSaved.auth;
+
+  const existingIds = new Set(provider.models.map(model => model.id));
+  const loadCatalog = () => setCatalogRequest(fetchProviderModels({
+    id: provider.id, baseUrl: provider.baseUrl, auth: provider.auth, protocol: provider.protocol,
+    credential: credential.trim() || undefined,
+  }));
 
   return (
     <div className="grid gap-5 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)] sm:gap-6">
@@ -153,11 +161,6 @@ export function ModelProviderSettings() {
             value={provider.baseUrl} onChange={e => edit({ baseUrl: e.target.value })} />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="model-provider-models">{t("Model IDs (one per line)")}</Label>
-          <Textarea id="model-provider-models" rows={3} placeholder="example-model" spellCheck={false}
-            value={modelsText} onChange={e => { setModelsText(e.target.value); setError(null); setSaved(false); }} />
-        </div>
-        <div className="space-y-2">
           <Label htmlFor="model-provider-auth">{t("Authentication")}</Label>
           <Select value={provider.auth} onValueChange={(auth: ModelProvider["auth"]) => edit({ auth })} disabled={saving}>
             <SelectTrigger id="model-provider-auth"><SelectValue /></SelectTrigger>
@@ -173,6 +176,43 @@ export function ModelProviderSettings() {
             placeholder={canReuseCredential ? t("Credential saved") : undefined}
             value={credential} onChange={e => { setCredential(e.target.value); setSaved(false); setError(null); }} />
         </div>
+        <section aria-labelledby="model-provider-models" className="space-y-3 border-t border-border pt-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 id="model-provider-models" className="text-sm font-semibold">{t("Models")}</h3>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={loadCatalog}>
+                <Download className="mr-1.5 size-4" />{t("Fetch available models")}
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => setEditingModel("new")}>
+                <Plus className="mr-1.5 size-4" />{t("Manually add model")}
+              </Button>
+            </div>
+          </div>
+          {provider.models.length ? (
+            <ul className="divide-y rounded-lg border border-border">
+              {provider.models.map((model, index) => (
+                <li key={model.id} className="flex items-center gap-2 px-3 py-2.5">
+                  <div className="min-w-0 flex-1 space-y-0.5">
+                    <p className="break-all text-sm font-medium">{model.displayName || model.id}</p>
+                    {model.displayName !== model.id && <p className="break-all text-xs text-muted-foreground">{model.id}</p>}
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                      {model.contextLength && <span>{t("{count} tokens", { count: model.contextLength.toLocaleString(getLanguage()) })}</span>}
+                      {!!model.reasoningEfforts?.length && <span>{t("Thinking levels: {levels}", {
+                        levels: model.reasoningEfforts.map(effort => t(reasoningEffortLabels[effort])).join(getLanguage() === "zh-CN" ? "、" : ", "),
+                      })}</span>}
+                    </div>
+                  </div>
+                  <Button type="button" variant="ghost" size="icon" className="shrink-0" aria-label={t("Edit model {id}", { id: model.id })}
+                    title={t("Edit model")} onClick={() => setEditingModel(index)}><Pencil className="size-4" /></Button>
+                  <Button type="button" variant="ghost" size="icon" className="shrink-0" aria-label={t("Remove model {id}", { id: model.id })}
+                    title={t("Remove model")} onClick={() => edit({ models: provider.models.filter((_, i) => i !== index) })}>
+                    <Trash2 className="size-4" />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          ) : <p className="rounded-lg border border-dashed px-3 py-4 text-sm text-muted-foreground">{t("No models configured.")}</p>}
+        </section>
       </fieldset>
       <div className="flex flex-wrap items-center gap-2">
         <Button type="submit" disabled={saving}>
@@ -188,6 +228,28 @@ export function ModelProviderSettings() {
       </div>
       {error && <p role="alert" className="mt-3 text-sm text-destructive">{t(error)}</p>}
     </form>
+      {editingModel !== null && <ModelEditor
+        model={typeof editingModel === "number" ? provider.models[editingModel] : undefined}
+        existingIds={existingIds}
+        onClose={() => setEditingModel(null)}
+        onApply={model => {
+          const models = [...provider.models];
+          if (editingModel === "new") models.push(model);
+          else models[editingModel] = model;
+          edit({ models });
+          setEditingModel(null);
+        }}
+      />}
+      {catalogRequest && <ModelCatalog
+        request={catalogRequest}
+        existingIds={existingIds}
+        onRetry={loadCatalog}
+        onClose={() => setCatalogRequest(undefined)}
+        onAdd={models => {
+          edit({ models: [...provider.models, ...models] });
+          setCatalogRequest(undefined);
+        }}
+      />}
       <Dialog open={confirmRemove} onOpenChange={setConfirmRemove}>
         <DialogContent>
           <DialogHeader>

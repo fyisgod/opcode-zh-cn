@@ -5,12 +5,26 @@ import { isTauriRuntime } from "./apiAdapter";
 
 export type ProviderProtocol = "anthropic" | "openAiChat" | "openAiResponses" | "gemini";
 
+export const reasoningEfforts = ["none", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
+export type ReasoningEffort = typeof reasoningEfforts[number];
+
+export const reasoningEffortLabels: Record<ReasoningEffort, string> = {
+  none: "None", minimal: "Minimal", low: "Low", medium: "Medium", high: "High", xhigh: "Extra high", max: "Maximum",
+};
+
+export interface ProviderModel {
+  id: string;
+  displayName: string;
+  contextLength?: number;
+  reasoningEfforts?: ReasoningEffort[];
+}
+
 export interface ModelProvider {
   id: string;
   name: string;
   enabled: boolean;
   baseUrl: string;
-  models: string[];
+  models: ProviderModel[];
   auth: "bearer" | "apiKey";
   protocol: ProviderProtocol;
   hasCredential: boolean;
@@ -21,6 +35,12 @@ export type ModelSelection =
   | { model: string; providerId: string };
 
 type ProviderUpdate = Omit<ModelProvider, "hasCredential"> & { credential?: string };
+
+type CatalogRequest = Pick<ModelProvider, "id" | "baseUrl" | "auth" | "protocol"> & { credential?: string };
+
+export function fetchProviderModels(request: CatalogRequest) {
+  return invoke<ProviderModel[]>("fetch_provider_models", { request });
+}
 
 const useProviderStore = create<{ providers: ModelProvider[]; loaded: boolean; error: boolean }>(() => ({
   providers: [], loaded: false, error: false,
@@ -65,10 +85,10 @@ export function useModelProviders() {
 
 export function initialModel(providers: ModelProvider[]): ModelSelection {
   const legacy = providers.find(provider => provider.id === "legacy-provider" && provider.enabled && provider.hasCredential);
-  return legacy?.models[0] ? { model: legacy.models[0], providerId: legacy.id } : { model: "sonnet" };
+  return legacy?.models[0] ? { model: legacy.models[0].id, providerId: legacy.id } : { model: "sonnet" };
 }
 
 export function savedProviderFor(selection: ModelSelection, providers: ModelProvider[]) {
   return providers.find(provider => provider.id === selection.providerId && provider.enabled
-    && provider.hasCredential && provider.models.includes(selection.model));
+    && provider.hasCredential && provider.models.some(model => model.id === selection.model));
 }

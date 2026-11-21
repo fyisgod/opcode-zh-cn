@@ -841,9 +841,10 @@ const FloatingPromptInputInner = (
   };
 
   const renderModelPicker = (expanded: boolean) => {
+    const configuredModel = selectedProvider?.models.find(model => model.id === selectedModel.model);
     const unavailableLabel = translate("Model unavailable");
     const label = modelUnavailable ? unavailableLabel : modelPending ? translate("Select model")
-      : selectedProvider ? selectedModel.model : selectedModel.model === "opus" ? "Opus" : "Sonnet";
+      : (configuredModel?.displayName || configuredModel?.id) || (selectedModel.model === "opus" ? "Opus" : "Sonnet");
     const title = selectedProvider ? `${selectedProvider.name} / ${selectedModel.model}`
       : modelPending && modelsError ? translate("Could not load model provider settings.") : label;
     const choose = (model: ModelSelection) => (onModelChange ?? setLocalModel)(model);
@@ -852,8 +853,8 @@ const FloatingPromptInputInner = (
         const builtin = BUILTIN_MODELS.find(model => modelKey(model) === key);
         if (builtin) return choose({ model: builtin.model });
         for (const provider of activeProviders) {
-          const model = provider.models.find(model => modelKey({ providerId: provider.id, model }) === key);
-          if (model) return choose({ providerId: provider.id, model });
+          const model = provider.models.find(model => modelKey({ providerId: provider.id, model: model.id }) === key);
+          if (model) return choose({ providerId: provider.id, model: model.id });
         }
       }}>
         <SelectTrigger aria-label={translate("Select model")} title={title}
@@ -875,7 +876,7 @@ const FloatingPromptInputInner = (
           {activeProviders.map(provider => (
             <SelectGroup key={provider.id} className="mt-1 border-t border-border pt-1">
               <SelectLabel className={modelGroupLabel} title={provider.name}>{provider.name}</SelectLabel>
-              {provider.models.map(model => <SelectItem className={modelOption} key={model} title={model} value={modelKey({ providerId: provider.id, model })}>{model}</SelectItem>)}
+              {provider.models.map(model => <SelectItem className={modelOption} key={model.id} title={model.id} value={modelKey({ providerId: provider.id, model: model.id })}>{model.displayName || model.id}</SelectItem>)}
             </SelectGroup>
           ))}
         </SelectContent>

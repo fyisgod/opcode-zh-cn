@@ -1,3 +1,5 @@
+pub mod catalog;
+
 use std::{collections::HashSet, fs, io::Write, net::IpAddr, path::PathBuf, sync::Mutex};
 
 use super::provider_bridge::ProviderBridge;
@@ -68,11 +70,91 @@ struct ProviderConnection {
     protocol: Protocol,
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+enum ReasoningEffort {
+    None,
+    Minimal,
+    Low,
+    Medium,
+    High,
+    Xhigh,
+    Max,
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderModel {
+    id: String,
+    #[serde(default)]
+    display_name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    context_length: Option<u32>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    reasoning_efforts: Vec<ReasoningEffort>,
+}
+
+impl ProviderModel {
+    fn from_id(id: String) -> Self {
+        Self {
+            display_name: id.clone(),
+            id,
+            context_length: None,
+            reasoning_efforts: Vec::new(),
+        }
+    }
+
+    fn valid_id(id: &str) -> bool {
+        !id.is_empty()
+            && !id.starts_with('-')
+            && !id.chars().any(|c| c.is_whitespace() || c.is_control())
+    }
+
+    fn normalize(&mut self) {
+        self.id = self.id.trim().to_owned();
+        self.display_name = self.display_name.trim().to_owned();
+        if self.display_name.is_empty() {
+            self.display_name.clone_from(&self.id);
+        }
+        let mut efforts = Vec::new();
+        self.reasoning_efforts.retain(|effort| {
+            if efforts.contains(effort) {
+                return false;
+            }
+            efforts.push(*effort);
+            true
+        });
+    }
+}
+
+fn deserialize_models<'de, D>(deserializer: D) -> Result<Vec<ProviderModel>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum ModelEntry {
+        Id(String),
+        Model(ProviderModel),
+    }
+
+    Vec::<ModelEntry>::deserialize(deserializer).map(|entries| {
+        entries
+            .into_iter()
+            .map(|entry| match entry {
+                ModelEntry::Id(id) => ProviderModel::from_id(id),
+                ModelEntry::Model(model) => model,
+            })
+            .collect()
+    })
+}
+
 #[derive(Default, Deserialize, Serialize)]
 struct Provider {
     id: String,
     name: String,
-    models: Vec<String>,
+    #[serde(deserialize_with = "deserialize_models")]
+    models: Vec<ProviderModel>,
     #[serde(flatten)]
     connection: ProviderConnection,
 }
@@ -125,7 +207,7 @@ impl ProviderFile {
                             models: if model.is_empty() {
                                 Vec::new()
                             } else {
-                                vec![model]
+                                vec![ProviderModel::from_id(model)]
                             },
                             connection,
                         },
@@ -201,6 +283,13 @@ fn normalized_url(value: &str) -> Result<String, String> {
     Ok(url.as_str().trim_end_matches('/').to_string())
 }
 
+fn validate_credential(value: &str) -> Result<(), String> {
+    if value.is_empty() || value.bytes().any(|b| !(0x21..=0x7e).contains(&b)) {
+        return Err("Enter a valid API credential.".into());
+    }
+    Ok(())
+}
+
 fn persist(path: &std::path::Path, registry: &Registry) -> Result<(), String> {
     let dir = path
         .parent()
@@ -244,22 +333,35 @@ impl Registry {
         }
         let mut seen = HashSet::new();
         provider.models.retain_mut(|model| {
-            *model = model.trim().to_string();
-            !model.is_empty() && seen.insert(model.clone())
+            model.normalize();
+            !model.id.is_empty() && seen.insert(model.id.clone())
         });
         if (connection.enabled && provider.models.is_empty())
-            || provider.models.iter().any(|model| {
-                model.starts_with('-') || model.chars().any(|c| c.is_whitespace() || c.is_control())
-            })
+            || provider
+                .models
+                .iter()
+                .any(|model| !ProviderModel::valid_id(&model.id))
         {
-            return Err("Enter valid model IDs, one per line.".into());
+            return Err("Enter valid model IDs.".into());
+        }
+        if provider
+            .models
+            .iter()
+            .any(|model| model.display_name.chars().any(char::is_control))
+        {
+            return Err("Enter a valid model display name.".into());
+        }
+        if provider
+            .models
+            .iter()
+            .any(|model| model.context_length == Some(0))
+        {
+            return Err("Context length must be a positive whole number.".into());
         }
         let credential = match update.credential {
             Some(value) if value.is_empty() => String::new(),
             Some(value) => {
-                if value.bytes().any(|b| !(0x21..=0x7e).contains(&b)) {
-                    return Err("Enter a valid API credential.".into());
-                }
+                validate_credential(&value)?;
                 protect_credential(&value)?
             }
             None => index
@@ -359,7 +461,7 @@ impl ActiveProvider {
                         .provider
                         .models
                         .iter()
-                        .any(|candidate| candidate == model)
+                        .any(|candidate| candidate.id == model)
             })
             .ok_or("The selected model is no longer available.")?;
         let connection = saved.provider.connection;
@@ -562,7 +664,10 @@ mod tests {
             provider: Provider {
                 id: id.into(),
                 name: "Test provider".into(),
-                models: models.iter().map(|model| model.to_string()).collect(),
+                models: models
+                    .iter()
+                    .map(|model| ProviderModel::from_id(model.to_string()))
+                    .collect(),
                 connection: ProviderConnection {
                     enabled: true,
                     base_url: url.into(),
@@ -585,7 +690,10 @@ mod tests {
         let saved = &registry.providers[0];
         assert_eq!(saved.provider.id, LEGACY_PROVIDER_ID);
         assert_eq!(saved.provider.name, "legacy.example");
-        assert_eq!(saved.provider.models, ["legacy-model"]);
+        assert_eq!(
+            saved.provider.models,
+            [ProviderModel::from_id("legacy-model".into())]
+        );
         assert!(saved.provider.connection.enabled);
         assert_eq!(saved.provider.connection.protocol, Protocol::Anthropic);
         assert_eq!(saved.credential, "opaque-encrypted-credential");
@@ -606,6 +714,35 @@ mod tests {
         assert_eq!(
             stored.providers[0].credential,
             "opaque-encrypted-credential"
+        );
+    }
+
+    #[test]
+    fn round_trips_metadata_alongside_existing_model_ids() {
+        let update = serde_json::from_value(serde_json::json!({
+            "id": "", "name": "Test", "enabled": true, "baseUrl": "https://test.example",
+            "auth": "bearer", "protocol": "anthropic", "credential": "dummy-key",
+            "models": ["old", {"id": "new", "displayName": "New model", "contextLength": 200000,
+                "reasoningEfforts": ["low", "high", "high"]}]
+        }))
+        .unwrap();
+        let mut registry = Registry::default();
+        let id = registry.upsert(update).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("model-provider.json");
+        persist(&path, &registry).unwrap();
+        let stored = load(&path).unwrap();
+        let models = &stored.providers[0].provider.models;
+        assert_eq!(models[0], ProviderModel::from_id("old".into()));
+        assert_eq!(models[1].display_name, "New model");
+        assert_eq!(models[1].context_length, Some(200_000));
+        assert_eq!(
+            models[1].reasoning_efforts,
+            [ReasoningEffort::Low, ReasoningEffort::High]
+        );
+        assert_eq!(
+            ActiveProvider::resolve(stored, &id, "new").unwrap().model,
+            "new"
         );
     }
 
@@ -637,7 +774,15 @@ mod tests {
             assert_eq!(active.credential, key);
             assert_eq!(active.model, model);
         }
-        assert_eq!(registry.providers[0].provider.models, ["same", "alternate"]);
+        assert_eq!(
+            registry.providers[0]
+                .provider
+                .models
+                .iter()
+                .map(|model| model.id.as_str())
+                .collect::<Vec<_>>(),
+            ["same", "alternate"]
+        );
         assert!(resolve(&b, "alternate").is_err());
         let mut disabled = update(&a, "https://a.example", &["same"], None);
         disabled.provider.connection.enabled = false;
