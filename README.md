@@ -52,6 +52,7 @@ Think of opcode as your command center for Claude Code - bridging the gap betwee
   - [📝 CLAUDE.md Management](#-claudemd-management)
 - [📖 Usage](#-usage)
   - [Getting Started](#getting-started)
+  - [Custom Model Provider](#custom-model-provider)
   - [Managing Projects](#managing-projects)
   - [Creating Agents](#creating-agents)
   - [Tracking Usage](#tracking-usage)
@@ -112,6 +113,25 @@ Think of opcode as your command center for Claude Code - bridging the gap betwee
 1. **Launch opcode**: Open the application after installation
 2. **Welcome Screen**: Choose between CC Agents or Projects
 3. **First Time Setup**: opcode will automatically detect your `~/.claude` directory
+
+### Custom Model Provider
+
+In the desktop app, open **Settings → Model provider** and enable **Custom provider**. Select the protocol your provider documents, then enter its base URL, model ID, authentication method, and API credential. Choose **Save provider** to apply the change.
+
+| API protocol | URL example | Routing |
+| --- | --- | --- |
+| Anthropic Messages | `https://api.anthropic.com` (no `/v1/messages`) | Direct from Claude Code |
+| OpenAI Chat Completions | `https://api.openai.com/v1` | Local adapter to `/chat/completions` |
+| OpenAI Responses | `https://api.openai.com/v1` | Local adapter to `/responses` |
+| Gemini (OpenAI-compatible) | `https://generativelanguage.googleapis.com/v1beta/openai` | Local adapter to Google's Chat Completions endpoint, using Bearer authentication |
+
+For adapted protocols, a complete endpoint URL also works. Use HTTPS except for loopback development servers. An existing provider without a saved protocol defaults to Anthropic Messages. Changing the protocol, endpoint, or authentication method requires re-entering the credential.
+
+The local adapter supports streamed text, image input, and client-side function calls on models that accept them. It does not expose vendor-hosted tools. Token counts are estimates when the upstream API does not supply them. Opaque tool reasoning metadata is replayed within a single CLI run but is not saved as session history. Gemini uses the OpenAI-compatible interface, not the native `generateContent` interface.
+
+Use Claude Code 2.1.329 or later. There is one active provider for desktop chats. It takes effect on the next prompt, including when continuing or resuming; the provider may receive prior conversation history. Disabling it restores your normal Claude Code configuration. Terminal sessions, CC Agents, and web mode are unchanged.
+
+Opcode stores the configuration separately from `~/.claude/settings.json`. Windows protects the saved credential with DPAPI. On Unix, the configuration file is owner-readable and stores the credential without encryption. The adapter listens only on loopback, uses a per-run token, and does not give the upstream credential to the CLI. To erase the saved credential, choose **Disable and remove credential**.
 
 ### Managing Projects
 

@@ -593,22 +593,6 @@ fn create_command_with_env(program: &str) -> Command {
     tokio_cmd
 }
 
-/// Creates a system binary command with the given arguments
-fn create_system_command(claude_path: &str, args: Vec<String>, project_path: &str) -> Command {
-    let mut cmd = create_command_with_env(claude_path);
-
-    // Add all arguments
-    for arg in args {
-        cmd.arg(arg);
-    }
-
-    cmd.current_dir(project_path)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-
-    cmd
-}
-
 /// Gets the user's home directory path
 #[tauri::command]
 pub async fn get_home_directory() -> Result<String, String> {
@@ -1223,21 +1207,7 @@ pub async fn execute_claude_code(
         model
     );
 
-    let claude_path = find_claude_binary(&app)?;
-
-    let args = vec![
-        "-p".to_string(),
-        prompt.clone(),
-        "--model".to_string(),
-        model.clone(),
-        "--output-format".to_string(),
-        "stream-json".to_string(),
-        "--verbose".to_string(),
-        "--dangerously-skip-permissions".to_string(),
-    ];
-
-    let cmd = create_system_command(&claude_path, args, &project_path);
-    spawn_claude_process(app, cmd, prompt, model, project_path).await
+    run_claude_prompt(app, project_path, prompt, model, &[]).await
 }
 
 /// Continue an existing Claude Code conversation with streaming output
@@ -1254,22 +1224,7 @@ pub async fn continue_claude_code(
         model
     );
 
-    let claude_path = find_claude_binary(&app)?;
-
-    let args = vec![
-        "-c".to_string(), // Continue flag
-        "-p".to_string(),
-        prompt.clone(),
-        "--model".to_string(),
-        model.clone(),
-        "--output-format".to_string(),
-        "stream-json".to_string(),
-        "--verbose".to_string(),
-        "--dangerously-skip-permissions".to_string(),
-    ];
-
-    let cmd = create_system_command(&claude_path, args, &project_path);
-    spawn_claude_process(app, cmd, prompt, model, project_path).await
+    run_claude_prompt(app, project_path, prompt, model, &["-c"]).await
 }
 
 /// Resume an existing Claude Code session by ID with streaming output
@@ -1288,23 +1243,41 @@ pub async fn resume_claude_code(
         model
     );
 
+    run_claude_prompt(app, project_path, prompt, model, &["--resume", &session_id]).await
+}
+
+async fn run_claude_prompt(
+    app: AppHandle,
+    project_path: String,
+    prompt: String,
+    model: String,
+    session_args: &[&str],
+) -> Result<(), String> {
     let claude_path = find_claude_binary(&app)?;
-
-    let args = vec![
-        "--resume".to_string(),
-        session_id.clone(),
-        "-p".to_string(),
-        prompt.clone(),
-        "--model".to_string(),
-        model.clone(),
-        "--output-format".to_string(),
-        "stream-json".to_string(),
-        "--verbose".to_string(),
-        "--dangerously-skip-permissions".to_string(),
-    ];
-
-    let cmd = create_system_command(&claude_path, args, &project_path);
-    spawn_claude_process(app, cmd, prompt, model, project_path).await
+    let mut cmd = create_command_with_env(&claude_path);
+    let (model, provider_bridge) = match super::model_provider::ActiveProvider::load(&app)? {
+        Some(provider) => {
+            super::model_provider::check_cli_support(&claude_path).await?;
+            let bridge = provider.configure(&mut cmd).await?;
+            (provider.model, bridge)
+        }
+        None => (model, None),
+    };
+    cmd.args(session_args)
+        .args([
+            "-p",
+            &prompt,
+            "--model",
+            &model,
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--dangerously-skip-permissions",
+        ])
+        .current_dir(&project_path)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    spawn_claude_process(app, cmd, prompt, model, project_path, provider_bridge).await
 }
 
 /// Cancel the currently running Claude Code execution
@@ -1487,6 +1460,7 @@ async fn spawn_claude_process(
     prompt: String,
     model: String,
     project_path: String,
+    provider_bridge: Option<super::provider_bridge::ProviderBridge>,
 ) -> Result<(), String> {
     use std::sync::Mutex;
     use tokio::io::{AsyncBufReadExt, BufReader};
@@ -1609,6 +1583,7 @@ async fn spawn_claude_process(
     tokio::spawn(async move {
         let _ = stdout_task.await;
         let _ = stderr_task.await;
+        drop(provider_bridge);
 
         // Get the child from the state to wait on it
         let mut current_process = claude_state_wait.lock().await;

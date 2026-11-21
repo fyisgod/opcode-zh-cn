@@ -36,6 +36,7 @@ use commands::mcp::{
     mcp_serve, mcp_test_connection,
 };
 
+use commands::model_provider::{get_model_provider, save_model_provider};
 use commands::proxy::{apply_proxy_settings, get_proxy_settings, save_proxy_settings};
 use commands::storage::{
     storage_delete_row, storage_execute_sql, storage_insert_row, storage_list_tables,
@@ -289,6 +290,8 @@ fn main() {
             // Proxy Settings
             get_proxy_settings,
             save_proxy_settings,
+            get_model_provider,
+            save_model_provider,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

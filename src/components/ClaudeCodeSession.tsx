@@ -1,4 +1,5 @@
 import { t as translate, useLanguage } from "@/lib/i18n";
+import { useCustomModel } from "@/lib/modelProvider";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -84,6 +85,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
   onProjectPathChange,
 }) => {
   useLanguage();
+  const customModel = useCustomModel();
   const [projectPath] = useState(initialProjectPath || session?.project_path || "");
   const [messages, setMessages] = useState<ClaudeStreamMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -881,7 +883,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
       // Surface the backend's reason (e.g. "Project directory not found: ...")
       // instead of hiding it behind a generic message.
       const detail = typeof err === "string" ? err : err instanceof Error ? err.message : "";
-      setError(detail ? translate("Failed to send prompt: {v1}", { v1: String(detail) }) : translate("Failed to send prompt"));
+      setError(detail ? translate("Failed to send prompt: {v1}", { v1: translate(detail) }) : translate("Failed to send prompt"));
       setIsLoading(false);
       hasActiveSessionRef.current = false;
     }
@@ -1414,8 +1416,8 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-xs font-medium text-muted-foreground">#{index + 1}</span>
-                          <span className="text-xs px-1.5 py-0.5 bg-primary/10 text-primary rounded">
-                            {queuedPrompt.model === "opus" ? "Opus" : "Sonnet"}
+                          <span className="truncate text-xs px-1.5 py-0.5 bg-primary/10 text-primary rounded" title={customModel ?? undefined}>
+                            {customModel ?? (queuedPrompt.model === "opus" ? "Opus" : "Sonnet")}
                           </span>
                         </div>
                         <p className="text-sm line-clamp-2 break-words">{queuedPrompt.prompt}</p>
@@ -1539,6 +1541,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
             <FloatingPromptInput
               ref={floatingPromptRef}
               embedded
+              customModel={customModel}
               onSend={handleSendPrompt}
               onCancel={handleCancelExecution}
               isLoading={isLoading}

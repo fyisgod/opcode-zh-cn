@@ -27,6 +27,8 @@ import { StorageTab } from "./StorageTab";
 import { HooksEditor } from "./HooksEditor";
 import { SlashCommandsManager } from "./SlashCommandsManager";
 import { ProxySettings } from "./ProxySettings";
+import { ModelProviderSettings } from "./ModelProviderSettings";
+import { isTauriRuntime } from "@/lib/apiAdapter";
 import { useTheme, useTrackEvent } from "@/hooks";
 import { analytics } from "@/lib/analytics";
 import { TabPersistenceService } from "@/services/tabPersistence";
@@ -346,7 +348,7 @@ export const Settings: React.FC<SettingsProps> = ({
                 {translate("Configure Claude Code preferences")}
               </p>
             </div>
-            <motion.div
+            {activeTab !== "provider" && <motion.div
               whileTap={{ scale: 0.97 }}
               transition={{ duration: 0.15 }}
             >
@@ -367,7 +369,7 @@ export const Settings: React.FC<SettingsProps> = ({
                   </>
                 )}
               </Button>
-            </motion.div>
+            </motion.div>}
           </div>
         </div>
       
@@ -395,8 +397,9 @@ export const Settings: React.FC<SettingsProps> = ({
       ) : (
         <div className="flex-1 overflow-y-auto p-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid grid-cols-8 w-full mb-6 h-auto p-1">
+            <TabsList className="flex flex-wrap justify-start w-full mb-6 h-auto p-1">
               <TabsTrigger value="general" className="py-2.5 px-3">{translate("General")}</TabsTrigger>
+              {isTauriRuntime() && <TabsTrigger value="provider" className="py-2.5 px-3">{translate("Model provider")}</TabsTrigger>}
               <TabsTrigger value="permissions" className="py-2.5 px-3">{translate("Permissions")}</TabsTrigger>
               <TabsTrigger value="environment" className="py-2.5 px-3">{translate("Environment")}</TabsTrigger>
               <TabsTrigger value="advanced" className="py-2.5 px-3">{translate("Advanced")}</TabsTrigger>
@@ -405,6 +408,8 @@ export const Settings: React.FC<SettingsProps> = ({
               <TabsTrigger value="storage" className="py-2.5 px-3">{translate("Storage")}</TabsTrigger>
               <TabsTrigger value="proxy" className="py-2.5 px-3">{translate("Proxy")}</TabsTrigger>
             </TabsList>
+
+            {isTauriRuntime() && <TabsContent value="provider"><ModelProviderSettings /></TabsContent>}
             
             {/* General Settings */}
             <TabsContent value="general" className="space-y-6 mt-6">

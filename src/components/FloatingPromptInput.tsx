@@ -45,6 +45,7 @@ interface FloatingPromptInputProps {
    * Default model to select
    */
   defaultModel?: "sonnet" | "opus";
+  customModel?: string | null;
   /**
    * Project path for file picker
    */
@@ -210,6 +211,7 @@ const FloatingPromptInputInner = (
     disabled = false,
     embedded = false,
     defaultModel = "sonnet",
+    customModel,
     projectPath,
     className,
     onCancel,
@@ -916,7 +918,9 @@ const FloatingPromptInputInner = (
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground">{translate("Model:")}</span>
-                    <Popover
+                    {customModel ? (
+                      <span className="max-w-40 truncate text-sm font-medium" title={customModel}>{customModel}</span>
+                    ) : <Popover
                       trigger={
                         <Button
                           variant="outline"
@@ -964,7 +968,7 @@ const FloatingPromptInputInner = (
                       onOpenChange={setModelPickerOpen}
                       align="start"
                       side="top"
-                    />
+                    />}
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -1085,7 +1089,14 @@ const FloatingPromptInputInner = (
             <div className="flex items-end gap-2">
               {/* Model & Thinking Mode Selectors - Left side, fixed at bottom */}
               <div className="flex items-center gap-1 shrink-0 mb-1">
-                <Popover
+                {customModel ? (
+                  <TooltipSimple content={customModel} side="top">
+                    <span className="flex h-9 max-w-28 items-center gap-1.5 px-2 text-xs font-medium">
+                      <Zap className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
+                      <span className="truncate">{customModel}</span>
+                    </span>
+                  </TooltipSimple>
+                ) : <Popover
                   trigger={
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -1149,7 +1160,7 @@ const FloatingPromptInputInner = (
                 onOpenChange={setModelPickerOpen}
                 align="start"
                 side="top"
-              />
+              />}
 
                 <Popover
                   trigger={
