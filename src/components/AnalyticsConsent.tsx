@@ -1,3 +1,4 @@
+import { t as translate, useLanguage } from "@/lib/i18n";
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BarChart3, Shield, X, Check, Info } from 'lucide-react';
@@ -18,6 +19,7 @@ export const AnalyticsConsent: React.FC<AnalyticsConsentProps> = ({
   onOpenChange,
   onComplete,
 }) => {
+  useLanguage();
   const [internalOpen, setInternalOpen] = useState(false);
   const [hasShownConsent, setHasShownConsent] = useState(false);
   
@@ -70,10 +72,10 @@ export const AnalyticsConsent: React.FC<AnalyticsConsentProps> = ({
               <div className="p-2 bg-purple-100 dark:bg-purple-900/20 rounded-lg">
                 <BarChart3 className="h-6 w-6 text-purple-600 dark:text-purple-400" />
               </div>
-              <DialogTitle className="text-2xl">Help Improve opcode</DialogTitle>
+              <DialogTitle className="text-2xl">{translate("Help Improve opcode")}</DialogTitle>
             </div>
             <DialogDescription className="text-base mt-2">
-              We'd like to collect anonymous usage data to improve your experience.
+              {translate("We'd like to collect anonymous usage data to improve your experience.")}
             </DialogDescription>
           </DialogHeader>
         </div>
@@ -84,12 +86,12 @@ export const AnalyticsConsent: React.FC<AnalyticsConsentProps> = ({
               <div className="flex gap-3">
                 <Check className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
                 <div className="space-y-1">
-                  <p className="font-medium text-green-900 dark:text-green-100">What we collect:</p>
+                  <p className="font-medium text-green-900 dark:text-green-100">{translate("What we collect:")}</p>
                   <ul className="text-sm text-green-800 dark:text-green-200 space-y-1">
-                    <li>• Feature usage (which tools and commands you use)</li>
-                    <li>• Performance metrics (app speed and reliability)</li>
-                    <li>• Error reports (to fix bugs and improve stability)</li>
-                    <li>• General usage patterns (session frequency and duration)</li>
+                    <li>{translate("• Feature usage (which tools and commands you use)")}</li>
+                    <li>{translate("• Performance metrics (app speed and reliability)")}</li>
+                    <li>{translate("• Error reports (to fix bugs and improve stability)")}</li>
+                    <li>{translate("• General usage patterns (session frequency and duration)")}</li>
                   </ul>
                 </div>
               </div>
@@ -99,13 +101,13 @@ export const AnalyticsConsent: React.FC<AnalyticsConsentProps> = ({
               <div className="flex gap-3">
                 <Shield className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
                 <div className="space-y-1">
-                  <p className="font-medium text-blue-900 dark:text-blue-100">Your privacy is protected:</p>
+                  <p className="font-medium text-blue-900 dark:text-blue-100">{translate("Your privacy is protected:")}</p>
                   <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
-                    <li>• No personal information is collected</li>
-                    <li>• No file contents, paths, or project names</li>
-                    <li>• No API keys or sensitive data</li>
-                    <li>• Completely anonymous with random IDs</li>
-                    <li>• You can opt-out anytime in Settings</li>
+                    <li>{translate("• No personal information is collected")}</li>
+                    <li>{translate("• No file contents, paths, or project names")}</li>
+                    <li>{translate("• No API keys or sensitive data")}</li>
+                    <li>{translate("• Completely anonymous with random IDs")}</li>
+                    <li>{translate("• You can opt-out anytime in Settings")}</li>
                   </ul>
                 </div>
               </div>
@@ -116,8 +118,7 @@ export const AnalyticsConsent: React.FC<AnalyticsConsentProps> = ({
             <div className="flex gap-2 items-start">
               <Info className="h-4 w-4 text-gray-500 flex-shrink-0 mt-0.5" />
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                This data helps us understand which features are most valuable, identify performance 
-                issues, and prioritize improvements. Your choice won't affect any functionality.
+                {translate("This data helps us understand which features are most valuable, identify performance issues, and prioritize improvements. Your choice won't affect any functionality.")}
               </p>
             </div>
           </div>
@@ -129,13 +130,13 @@ export const AnalyticsConsent: React.FC<AnalyticsConsentProps> = ({
             variant="outline"
             className="flex-1"
           >
-            No Thanks
+            {translate("No Thanks")}
           </Button>
           <Button
             onClick={handleAccept}
             className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
           >
-            Allow Analytics
+            {translate("Allow Analytics")}
           </Button>
         </div>
       </DialogContent>
@@ -150,6 +151,7 @@ interface AnalyticsConsentBannerProps {
 export const AnalyticsConsentBanner: React.FC<AnalyticsConsentBannerProps> = ({
   className,
 }) => {
+  useLanguage();
   const [visible, setVisible] = useState(false);
   const [hasChecked, setHasChecked] = useState(false);
   
@@ -198,9 +200,9 @@ export const AnalyticsConsentBanner: React.FC<AnalyticsConsentBannerProps> = ({
             <div className="flex items-start gap-3">
               <BarChart3 className="h-5 w-5 text-purple-600 dark:text-purple-400 flex-shrink-0 mt-0.5" />
               <div className="space-y-2 flex-1">
-                <p className="text-sm font-medium">Help improve opcode</p>
+                <p className="text-sm font-medium">{translate("Help improve opcode")}</p>
                 <p className="text-xs text-gray-600 dark:text-gray-400">
-                  We collect anonymous usage data to improve your experience. No personal data is collected.
+                  {translate("We collect anonymous usage data to improve your experience. No personal data is collected.")}
                 </p>
                 <div className="flex gap-2 pt-1">
                   <Button
@@ -209,14 +211,14 @@ export const AnalyticsConsentBanner: React.FC<AnalyticsConsentBannerProps> = ({
                     onClick={handleDecline}
                     className="text-xs"
                   >
-                    No Thanks
+                    {translate("No Thanks")}
                   </Button>
                   <Button
                     size="sm"
                     onClick={handleAccept}
                     className="text-xs bg-purple-600 hover:bg-purple-700 text-white"
                   >
-                    Allow
+                    {translate("Allow")}
                   </Button>
                 </div>
               </div>

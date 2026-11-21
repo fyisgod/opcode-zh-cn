@@ -1,3 +1,4 @@
+import { t as translate, useLanguage } from "@/lib/i18n";
 import React from "react";
 import { motion } from "framer-motion";
 import { Hash } from "lucide-react";
@@ -29,6 +30,7 @@ export const TokenCounter: React.FC<TokenCounterProps> = ({
   show = true,
   className,
 }) => {
+  useLanguage();
   if (!show || tokens === 0) return null;
 
   return (
@@ -47,7 +49,7 @@ export const TokenCounter: React.FC<TokenCounterProps> = ({
       <div className="flex items-center gap-1.5 text-xs">
         <Hash className="h-3 w-3 text-muted-foreground" />
         <span className="font-mono">{tokens.toLocaleString()}</span>
-        <span className="text-muted-foreground">tokens</span>
+        <span className="text-muted-foreground">{translate("tokens")}</span>
       </div>
     </motion.div>
   );

@@ -30,6 +30,7 @@ import { ProxySettings } from "./ProxySettings";
 import { useTheme, useTrackEvent } from "@/hooks";
 import { analytics } from "@/lib/analytics";
 import { TabPersistenceService } from "@/services/tabPersistence";
+import { setLanguage, t as translate, useLanguage, type Language } from "@/lib/i18n";
 
 interface SettingsProps {
   /**
@@ -60,6 +61,7 @@ interface EnvironmentVariable {
 export const Settings: React.FC<SettingsProps> = ({
   className,
 }) => {
+  const language = useLanguage();
   const [settings, setSettings] = useState<ClaudeSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -183,7 +185,7 @@ export const Settings: React.FC<SettingsProps> = ({
       }
     } catch (err) {
       console.error("Failed to load settings:", err);
-      setError("Failed to load settings. Please ensure ~/.claude directory exists.");
+      setError(translate("Failed to load settings. Please ensure ~/.claude directory exists."));
       setSettings({});
     } finally {
       setLoading(false);
@@ -237,11 +239,11 @@ export const Settings: React.FC<SettingsProps> = ({
         setProxySettingsChanged(false);
       }
 
-      setToast({ message: "Settings saved successfully!", type: "success" });
+      setToast({ message: translate("Settings saved successfully!"), type: "success" });
     } catch (err) {
       console.error("Failed to save settings:", err);
-      setError("Failed to save settings.");
-      setToast({ message: "Failed to save settings", type: "error" });
+      setError(translate("Failed to save settings."));
+      setToast({ message: translate("Failed to save settings"), type: "error" });
     } finally {
       setSaving(false);
     }
@@ -339,9 +341,9 @@ export const Settings: React.FC<SettingsProps> = ({
         <div className="p-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-heading-1">Settings</h1>
+              <h1 className="text-heading-1">{translate("Settings")}</h1>
               <p className="mt-1 text-body-small text-muted-foreground">
-                Configure Claude Code preferences
+                {translate("Configure Claude Code preferences")}
               </p>
             </div>
             <motion.div
@@ -356,12 +358,12 @@ export const Settings: React.FC<SettingsProps> = ({
                 {saving ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
+                    {translate("Saving...")}
                   </>
                 ) : (
                   <>
                     <Save className="mr-2 h-4 w-4" />
-                    Save Settings
+                    {translate("Save Settings")}
                   </>
                 )}
               </Button>
@@ -394,29 +396,41 @@ export const Settings: React.FC<SettingsProps> = ({
         <div className="flex-1 overflow-y-auto p-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid grid-cols-8 w-full mb-6 h-auto p-1">
-              <TabsTrigger value="general" className="py-2.5 px-3">General</TabsTrigger>
-              <TabsTrigger value="permissions" className="py-2.5 px-3">Permissions</TabsTrigger>
-              <TabsTrigger value="environment" className="py-2.5 px-3">Environment</TabsTrigger>
-              <TabsTrigger value="advanced" className="py-2.5 px-3">Advanced</TabsTrigger>
-              <TabsTrigger value="hooks" className="py-2.5 px-3">Hooks</TabsTrigger>
-              <TabsTrigger value="commands" className="py-2.5 px-3">Commands</TabsTrigger>
-              <TabsTrigger value="storage" className="py-2.5 px-3">Storage</TabsTrigger>
-              <TabsTrigger value="proxy" className="py-2.5 px-3">Proxy</TabsTrigger>
+              <TabsTrigger value="general" className="py-2.5 px-3">{translate("General")}</TabsTrigger>
+              <TabsTrigger value="permissions" className="py-2.5 px-3">{translate("Permissions")}</TabsTrigger>
+              <TabsTrigger value="environment" className="py-2.5 px-3">{translate("Environment")}</TabsTrigger>
+              <TabsTrigger value="advanced" className="py-2.5 px-3">{translate("Advanced")}</TabsTrigger>
+              <TabsTrigger value="hooks" className="py-2.5 px-3">{translate("Hooks")}</TabsTrigger>
+              <TabsTrigger value="commands" className="py-2.5 px-3">{translate("Commands")}</TabsTrigger>
+              <TabsTrigger value="storage" className="py-2.5 px-3">{translate("Storage")}</TabsTrigger>
+              <TabsTrigger value="proxy" className="py-2.5 px-3">{translate("Proxy")}</TabsTrigger>
             </TabsList>
             
             {/* General Settings */}
             <TabsContent value="general" className="space-y-6 mt-6">
               <Card className="p-6 space-y-6">
                 <div>
-                  <h3 className="text-heading-4 mb-4">General Settings</h3>
+                  <h3 className="text-heading-4 mb-4">{translate("General Settings")}</h3>
                   
                   <div className="space-y-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <Label htmlFor="ui-language">{translate("Interface language")}</Label>
+                      <select
+                        id="ui-language"
+                        className="rounded-md border border-border bg-background px-3 py-2 text-sm"
+                        value={language}
+                        onChange={(event) => setLanguage(event.target.value as Language)}
+                      >
+                        <option value="en" lang="en">English</option>
+                        <option value="zh-CN" lang="zh-CN">简体中文</option>
+                      </select>
+                    </div>
                     {/* Theme Selector */}
                     <div className="flex items-center justify-between">
                       <div>
-                        <Label>Theme</Label>
+                        <Label>{translate("Theme")}</Label>
                         <p className="text-caption text-muted-foreground mt-1">
-                          Choose your preferred color theme
+                          {translate("Choose your preferred color theme")}
                         </p>
                       </div>
                       <div className="flex items-center gap-1 p-1 bg-muted/30 rounded-lg">
@@ -430,7 +444,7 @@ export const Settings: React.FC<SettingsProps> = ({
                           )}
                         >
                           {theme === 'dark' && <Check className="h-3 w-3" />}
-                          Dark
+                          {translate("Dark")}
                         </button>
                         <button
                           onClick={() => setTheme('gray')}
@@ -442,7 +456,7 @@ export const Settings: React.FC<SettingsProps> = ({
                           )}
                         >
                           {theme === 'gray' && <Check className="h-3 w-3" />}
-                          Gray
+                          {translate("Gray")}
                         </button>
                         <button
                           onClick={() => setTheme('light')}
@@ -454,7 +468,7 @@ export const Settings: React.FC<SettingsProps> = ({
                           )}
                         >
                           {theme === 'light' && <Check className="h-3 w-3" />}
-                          Light
+                          {translate("Light")}
                         </button>
                         <button
                           onClick={() => setTheme('custom')}
@@ -466,7 +480,7 @@ export const Settings: React.FC<SettingsProps> = ({
                           )}
                         >
                           {theme === 'custom' && <Check className="h-3 w-3" />}
-                          Custom
+                          {translate("Custom")}
                         </button>
                       </div>
                     </div>
@@ -474,12 +488,12 @@ export const Settings: React.FC<SettingsProps> = ({
                     {/* Custom Color Editor */}
                     {theme === 'custom' && (
                       <div className="space-y-4 p-4 border rounded-lg bg-muted/20">
-                        <h4 className="text-label">Custom Theme Colors</h4>
+                        <h4 className="text-label">{translate("Custom Theme Colors")}</h4>
                         
                         <div className="grid grid-cols-2 gap-4">
                           {/* Background Color */}
                           <div className="space-y-2">
-                            <Label htmlFor="color-background" className="text-caption">Background</Label>
+                            <Label htmlFor="color-background" className="text-caption">{translate("Background")}</Label>
                             <div className="flex gap-2">
                               <Input
                                 id="color-background"
@@ -498,7 +512,7 @@ export const Settings: React.FC<SettingsProps> = ({
                           
                           {/* Foreground Color */}
                           <div className="space-y-2">
-                            <Label htmlFor="color-foreground" className="text-caption">Foreground</Label>
+                            <Label htmlFor="color-foreground" className="text-caption">{translate("Foreground")}</Label>
                             <div className="flex gap-2">
                               <Input
                                 id="color-foreground"
@@ -517,7 +531,7 @@ export const Settings: React.FC<SettingsProps> = ({
                           
                           {/* Primary Color */}
                           <div className="space-y-2">
-                            <Label htmlFor="color-primary" className="text-caption">Primary</Label>
+                            <Label htmlFor="color-primary" className="text-caption">{translate("Primary")}</Label>
                             <div className="flex gap-2">
                               <Input
                                 id="color-primary"
@@ -536,7 +550,7 @@ export const Settings: React.FC<SettingsProps> = ({
                           
                           {/* Card Color */}
                           <div className="space-y-2">
-                            <Label htmlFor="color-card" className="text-caption">Card</Label>
+                            <Label htmlFor="color-card" className="text-caption">{translate("Card")}</Label>
                             <div className="flex gap-2">
                               <Input
                                 id="color-card"
@@ -555,7 +569,7 @@ export const Settings: React.FC<SettingsProps> = ({
                           
                           {/* Accent Color */}
                           <div className="space-y-2">
-                            <Label htmlFor="color-accent" className="text-caption">Accent</Label>
+                            <Label htmlFor="color-accent" className="text-caption">{translate("Accent")}</Label>
                             <div className="flex gap-2">
                               <Input
                                 id="color-accent"
@@ -574,7 +588,7 @@ export const Settings: React.FC<SettingsProps> = ({
                           
                           {/* Destructive Color */}
                           <div className="space-y-2">
-                            <Label htmlFor="color-destructive" className="text-caption">Destructive</Label>
+                            <Label htmlFor="color-destructive" className="text-caption">{translate("Destructive")}</Label>
                             <div className="flex gap-2">
                               <Input
                                 id="color-destructive"
@@ -593,7 +607,7 @@ export const Settings: React.FC<SettingsProps> = ({
                         </div>
                         
                         <p className="text-caption text-muted-foreground">
-                          Use CSS color values (hex, rgb, oklch, etc.). Changes apply immediately.
+                          {translate("Use CSS color values (hex, rgb, oklch, etc.). Changes apply immediately.")}
                         </p>
                       </div>
                     )}
@@ -601,9 +615,9 @@ export const Settings: React.FC<SettingsProps> = ({
                     {/* Include Co-authored By */}
                     <div className="flex items-center justify-between">
                       <div className="space-y-0.5 flex-1">
-                        <Label htmlFor="coauthored">Include "Co-authored by Claude"</Label>
+                        <Label htmlFor="coauthored">{translate("Include \"Co-authored by Claude\"")}</Label>
                         <p className="text-caption text-muted-foreground">
-                          Add Claude attribution to git commits and pull requests
+                          {translate("Add Claude attribution to git commits and pull requests")}
                         </p>
                       </div>
                       <Switch
@@ -616,9 +630,9 @@ export const Settings: React.FC<SettingsProps> = ({
                     {/* Verbose Output */}
                     <div className="flex items-center justify-between">
                       <div className="space-y-0.5 flex-1">
-                        <Label htmlFor="verbose">Verbose Output</Label>
+                        <Label htmlFor="verbose">{translate("Verbose Output")}</Label>
                         <p className="text-caption text-muted-foreground">
-                          Show full bash and command outputs
+                          {translate("Show full bash and command outputs")}
                         </p>
                       </div>
                       <Switch
@@ -632,9 +646,9 @@ export const Settings: React.FC<SettingsProps> = ({
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
-                          <Label htmlFor="cleanup">Chat Transcript Retention (days)</Label>
+                          <Label htmlFor="cleanup">{translate("Chat Transcript Retention (days)")}</Label>
                           <p className="text-caption text-muted-foreground mt-1">
-                            How long to retain chat transcripts locally (default: 30 days)
+                            {translate("How long to retain chat transcripts locally (default: 30 days)")}
                           </p>
                         </div>
                         <Input
@@ -662,7 +676,7 @@ export const Settings: React.FC<SettingsProps> = ({
                       {binaryPathChanged && (
                         <p className="text-caption text-amber-600 dark:text-amber-400 flex items-center gap-1">
                           <AlertCircle className="h-3 w-3" />
-                          Changes will be applied when you save settings.
+                          {translate("Changes will be applied when you save settings.")}
                         </p>
                       )}
                     </div>
@@ -673,9 +687,9 @@ export const Settings: React.FC<SettingsProps> = ({
                     {/* Analytics Toggle */}
                     <div className="flex items-center justify-between">
                       <div className="space-y-1">
-                        <Label htmlFor="analytics-enabled">Enable Analytics</Label>
+                        <Label htmlFor="analytics-enabled">{translate("Enable Analytics")}</Label>
                         <p className="text-caption text-muted-foreground">
-                          Help improve opcode by sharing anonymous usage data
+                          {translate("Help improve opcode by sharing anonymous usage data")}
                         </p>
                       </div>
                       <Switch
@@ -686,12 +700,12 @@ export const Settings: React.FC<SettingsProps> = ({
                             await analytics.enable();
                             setAnalyticsEnabled(true);
                             trackEvent.settingsChanged('analytics_enabled', true);
-                            setToast({ message: "Analytics enabled", type: "success" });
+                            setToast({ message: translate("Analytics enabled"), type: "success" });
                           } else {
                             await analytics.disable();
                             setAnalyticsEnabled(false);
                             trackEvent.settingsChanged('analytics_enabled', false);
-                            setToast({ message: "Analytics disabled", type: "success" });
+                            setToast({ message: translate("Analytics disabled"), type: "success" });
                           }
                         }}
                       />
@@ -703,11 +717,11 @@ export const Settings: React.FC<SettingsProps> = ({
                         <div className="flex gap-2">
                           <Shield className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
                           <div className="space-y-1">
-                            <p className="text-xs font-medium text-foreground">Your privacy is protected</p>
+                            <p className="text-xs font-medium text-foreground">{translate("Your privacy is protected")}</p>
                             <ul className="text-xs text-muted-foreground space-y-0.5">
-                              <li>• No personal information or file contents collected</li>
-                              <li>• All data is anonymous with random IDs</li>
-                              <li>• You can disable analytics at any time</li>
+                              <li>{translate("• No personal information or file contents collected")}</li>
+                              <li>{translate("• All data is anonymous with random IDs")}</li>
+                              <li>{translate("• You can disable analytics at any time")}</li>
                             </ul>
                           </div>
                         </div>
@@ -717,9 +731,9 @@ export const Settings: React.FC<SettingsProps> = ({
                     {/* Tab Persistence Toggle */}
                     <div className="flex items-center justify-between">
                       <div className="space-y-1">
-                        <Label htmlFor="tab-persistence">Remember Open Tabs</Label>
+                        <Label htmlFor="tab-persistence">{translate("Remember Open Tabs")}</Label>
                         <p className="text-caption text-muted-foreground">
-                          Restore your tabs when you restart the app
+                          {translate("Restore your tabs when you restart the app")}
                         </p>
                       </div>
                       <Switch
@@ -731,8 +745,8 @@ export const Settings: React.FC<SettingsProps> = ({
                           trackEvent.settingsChanged('tab_persistence_enabled', checked);
                           setToast({ 
                             message: checked 
-                              ? "Tab persistence enabled - your tabs will be restored on restart" 
-                              : "Tab persistence disabled - tabs will not be saved", 
+                              ? translate("Tab persistence enabled - your tabs will be restored on restart")
+                              : translate("Tab persistence disabled - tabs will not be saved"),
                             type: "success" 
                           });
                         }}
@@ -742,9 +756,9 @@ export const Settings: React.FC<SettingsProps> = ({
                     {/* Startup Intro Toggle */}
                     <div className="flex items-center justify-between">
                       <div className="space-y-1">
-                        <Label htmlFor="startup-intro">Show Welcome Intro on Startup</Label>
+                        <Label htmlFor="startup-intro">{translate("Show Welcome Intro on Startup")}</Label>
                         <p className="text-caption text-muted-foreground">
-                          Display a brief welcome animation when the app launches
+                          {translate("Display a brief welcome animation when the app launches")}
                         </p>
                       </div>
                       <Switch
@@ -757,12 +771,12 @@ export const Settings: React.FC<SettingsProps> = ({
                             trackEvent.settingsChanged('startup_intro_enabled', checked);
                             setToast({ 
                               message: checked 
-                                ? 'Welcome intro enabled' 
-                                : 'Welcome intro disabled', 
+                                ? translate("Welcome intro enabled")
+                                : translate("Welcome intro disabled"),
                               type: 'success' 
                             });
                           } catch (e) {
-                            setToast({ message: 'Failed to update preference', type: 'error' });
+                            setToast({ message: translate("Failed to update preference"), type: 'error' });
                           }
                         }}
                       />
@@ -777,16 +791,16 @@ export const Settings: React.FC<SettingsProps> = ({
               <Card className="p-6">
                 <div className="space-y-6">
                   <div>
-                    <h3 className="text-heading-4 mb-2">Permission Rules</h3>
+                    <h3 className="text-heading-4 mb-2">{translate("Permission Rules")}</h3>
                     <p className="text-body-small text-muted-foreground mb-4">
-                      Control which tools Claude Code can use without manual approval
+                      {translate("Control which tools Claude Code can use without manual approval")}
                     </p>
                   </div>
                   
                   {/* Allow Rules */}
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <Label className="text-label text-green-500">Allow Rules</Label>
+                      <Label className="text-label text-green-500">{translate("Allow Rules")}</Label>
                       <Button
                         variant="outline"
                         size="sm"
@@ -794,13 +808,13 @@ export const Settings: React.FC<SettingsProps> = ({
                         className="gap-2 hover:border-green-500/50 hover:text-green-500"
                       >
                         <Plus className="h-3 w-3" />
-                        Add Rule
+                        {translate("Add Rule")}
                       </Button>
                     </div>
                     <div className="space-y-2">
                       {allowRules.length === 0 ? (
                         <p className="text-xs text-muted-foreground py-2">
-                          No allow rules configured. Claude will ask for approval for all tools.
+                          {translate("No allow rules configured. Claude will ask for approval for all tools.")}
                         </p>
                       ) : (
                         allowRules.map((rule) => (
@@ -812,7 +826,7 @@ export const Settings: React.FC<SettingsProps> = ({
                             className="flex items-center gap-2"
                           >
                             <Input
-                              placeholder="e.g., Bash(npm run test:*)"
+                              placeholder={translate("e.g., Bash(npm run test:*)")}
                               value={rule.value}
                               onChange={(e) => updatePermissionRule("allow", rule.id, e.target.value)}
                               className="flex-1"
@@ -834,7 +848,7 @@ export const Settings: React.FC<SettingsProps> = ({
                   {/* Deny Rules */}
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <Label className="text-label text-red-500">Deny Rules</Label>
+                      <Label className="text-label text-red-500">{translate("Deny Rules")}</Label>
                       <Button
                         variant="outline"
                         size="sm"
@@ -842,13 +856,13 @@ export const Settings: React.FC<SettingsProps> = ({
                         className="gap-2 hover:border-red-500/50 hover:text-red-500"
                       >
                         <Plus className="h-3 w-3" />
-                        Add Rule
+                        {translate("Add Rule")}
                       </Button>
                     </div>
                     <div className="space-y-2">
                       {denyRules.length === 0 ? (
                         <p className="text-xs text-muted-foreground py-2">
-                          No deny rules configured.
+                          {translate("No deny rules configured.")}
                         </p>
                       ) : (
                         denyRules.map((rule) => (
@@ -860,7 +874,7 @@ export const Settings: React.FC<SettingsProps> = ({
                             className="flex items-center gap-2"
                           >
                             <Input
-                              placeholder="e.g., Bash(curl:*)"
+                              placeholder={translate("e.g., Bash(curl:*)")}
                               value={rule.value}
                               onChange={(e) => updatePermissionRule("deny", rule.id, e.target.value)}
                               className="flex-1"
@@ -881,14 +895,14 @@ export const Settings: React.FC<SettingsProps> = ({
                   
                   <div className="pt-2 space-y-2">
                     <p className="text-xs text-muted-foreground">
-                      <strong>Examples:</strong>
+                      <strong>{translate("Examples:")}</strong>
                     </p>
                     <ul className="text-caption text-muted-foreground space-y-1 ml-4">
-                      <li>• <code className="px-1 py-0.5 rounded bg-green-500/10 text-green-600 dark:text-green-400">Bash</code> - Allow all bash commands</li>
-                      <li>• <code className="px-1 py-0.5 rounded bg-green-500/10 text-green-600 dark:text-green-400">Bash(npm run build)</code> - Allow exact command</li>
-                      <li>• <code className="px-1 py-0.5 rounded bg-green-500/10 text-green-600 dark:text-green-400">Bash(npm run test:*)</code> - Allow commands with prefix</li>
-                      <li>• <code className="px-1 py-0.5 rounded bg-green-500/10 text-green-600 dark:text-green-400">Read(~/.zshrc)</code> - Allow reading specific file</li>
-                      <li>• <code className="px-1 py-0.5 rounded bg-green-500/10 text-green-600 dark:text-green-400">Edit(docs/**)</code> - Allow editing files in docs directory</li>
+                      <li>• <code className="px-1 py-0.5 rounded bg-green-500/10 text-green-600 dark:text-green-400">Bash</code> {translate("- Allow all bash commands")}</li>
+                      <li>• <code className="px-1 py-0.5 rounded bg-green-500/10 text-green-600 dark:text-green-400">Bash(npm run build)</code> {translate("- Allow exact command")}</li>
+                      <li>• <code className="px-1 py-0.5 rounded bg-green-500/10 text-green-600 dark:text-green-400">Bash(npm run test:*)</code> {translate("- Allow commands with prefix")}</li>
+                      <li>• <code className="px-1 py-0.5 rounded bg-green-500/10 text-green-600 dark:text-green-400">Read(~/.zshrc)</code> {translate("- Allow reading specific file")}</li>
+                      <li>• <code className="px-1 py-0.5 rounded bg-green-500/10 text-green-600 dark:text-green-400">Edit(docs/**)</code> {translate("- Allow editing files in docs directory")}</li>
                     </ul>
                   </div>
                 </div>
@@ -901,9 +915,9 @@ export const Settings: React.FC<SettingsProps> = ({
                 <div className="space-y-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-heading-4">Environment Variables</h3>
+                      <h3 className="text-heading-4">{translate("Environment Variables")}</h3>
                       <p className="text-sm text-muted-foreground mt-1">
-                        Environment variables applied to every Claude Code session
+                        {translate("Environment variables applied to every Claude Code session")}
                       </p>
                     </div>
                     <Button
@@ -913,14 +927,14 @@ export const Settings: React.FC<SettingsProps> = ({
                       className="gap-2"
                     >
                       <Plus className="h-3 w-3" />
-                      Add Variable
+                      {translate("Add Variable")}
                     </Button>
                   </div>
                   
                   <div className="space-y-3">
                     {envVars.length === 0 ? (
                       <p className="text-xs text-muted-foreground py-2">
-                        No environment variables configured.
+                        {translate("No environment variables configured.")}
                       </p>
                     ) : (
                       envVars.map((envVar) => (
@@ -958,12 +972,12 @@ export const Settings: React.FC<SettingsProps> = ({
                   
                   <div className="pt-2 space-y-2">
                     <p className="text-xs text-muted-foreground">
-                      <strong>Common variables:</strong>
+                      <strong>{translate("Common variables:")}</strong>
                     </p>
                     <ul className="text-caption text-muted-foreground space-y-1 ml-4">
-                      <li>• <code className="px-1 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400">CLAUDE_CODE_ENABLE_TELEMETRY</code> - Enable/disable telemetry (0 or 1)</li>
-                      <li>• <code className="px-1 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400">ANTHROPIC_MODEL</code> - Custom model name</li>
-                      <li>• <code className="px-1 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400">DISABLE_COST_WARNINGS</code> - Disable cost warnings (1)</li>
+                      <li>• <code className="px-1 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400">CLAUDE_CODE_ENABLE_TELEMETRY</code> {translate("- Enable/disable telemetry (0 or 1)")}</li>
+                      <li>• <code className="px-1 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400">ANTHROPIC_MODEL</code> {translate("- Custom model name")}</li>
+                      <li>• <code className="px-1 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400">DISABLE_COST_WARNINGS</code> {translate("- Disable cost warnings (1)")}</li>
                     </ul>
                   </div>
                 </div>
@@ -974,15 +988,15 @@ export const Settings: React.FC<SettingsProps> = ({
               <Card className="p-6">
                 <div className="space-y-6">
                   <div>
-                    <h3 className="text-base font-semibold mb-4">Advanced Settings</h3>
+                    <h3 className="text-base font-semibold mb-4">{translate("Advanced Settings")}</h3>
                     <p className="text-sm text-muted-foreground mb-6">
-                      Additional configuration options for advanced users
+                      {translate("Additional configuration options for advanced users")}
                     </p>
                   </div>
                   
                   {/* API Key Helper */}
                   <div className="space-y-2">
-                    <Label htmlFor="apiKeyHelper">API Key Helper Script</Label>
+                    <Label htmlFor="apiKeyHelper">{translate("API Key Helper Script")}</Label>
                     <Input
                       id="apiKeyHelper"
                       placeholder="/path/to/generate_api_key.sh"
@@ -990,18 +1004,18 @@ export const Settings: React.FC<SettingsProps> = ({
                       onChange={(e) => updateSetting("apiKeyHelper", e.target.value || undefined)}
                     />
                     <p className="text-xs text-muted-foreground">
-                      Custom script to generate auth values for API requests
+                      {translate("Custom script to generate auth values for API requests")}
                     </p>
                   </div>
                   
                   {/* Raw JSON Editor */}
                   <div className="space-y-2">
-                    <Label>Raw Settings (JSON)</Label>
+                    <Label>{translate("Raw Settings (JSON)")}</Label>
                     <div className="p-3 rounded-md bg-muted font-mono text-xs overflow-x-auto whitespace-pre-wrap">
                       <pre>{JSON.stringify(settings, null, 2)}</pre>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      This shows the raw JSON that will be saved to ~/.claude/settings.json
+                      {translate("This shows the raw JSON that will be saved to ~/.claude/settings.json")}
                     </p>
                   </div>
                 </div>
@@ -1013,10 +1027,9 @@ export const Settings: React.FC<SettingsProps> = ({
               <Card className="p-6">
                 <div className="space-y-4">
                   <div>
-                    <h3 className="text-base font-semibold mb-2">User Hooks</h3>
+                    <h3 className="text-base font-semibold mb-2">{translate("User Hooks")}</h3>
                     <p className="text-body-small text-muted-foreground mb-4">
-                      Configure hooks that apply to all Claude Code sessions for your user account.
-                      These are stored in <code className="mx-1 px-2 py-1 bg-muted rounded text-xs">~/.claude/settings.json</code>
+                      {translate("Configure hooks that apply to all Claude Code sessions for your user account. These are stored in")} <code className="mx-1 px-2 py-1 bg-muted rounded text-xs">~/.claude/settings.json</code>
                     </p>
                   </div>
                   

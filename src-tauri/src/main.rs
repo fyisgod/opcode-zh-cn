@@ -1,5 +1,5 @@
-// Prevents additional console window on Windows in release, DO NOT REMOVE!!
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+// The desktop application does not need its own console window.
+#![cfg_attr(windows, windows_subsystem = "windows")]
 
 mod checkpoint;
 mod claude_binary;

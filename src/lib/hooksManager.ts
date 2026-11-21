@@ -1,3 +1,4 @@
+import { t as translate } from "@/lib/i18n";
 /**
  * Hooks configuration manager for Claude Code hooks
  */
@@ -135,7 +136,7 @@ export class HooksManager {
             errors.push({
               event,
               matcher: matcher.matcher,
-              message: `Invalid regex pattern: ${e instanceof Error ? e.message : 'Unknown error'}`
+              message: translate("Invalid regex pattern: {v1}", { v1: e instanceof Error ? e.message : translate("Unknown error") })
             });
           }
         }
@@ -147,7 +148,7 @@ export class HooksManager {
               errors.push({
                 event,
                 matcher: matcher.matcher,
-                message: 'Empty command'
+                message: translate("Empty command")
               });
             }
 
@@ -173,7 +174,7 @@ export class HooksManager {
         if (!hook.command || !hook.command.trim()) {
           errors.push({
             event,
-            message: 'Empty command'
+            message: translate("Empty command")
           });
         }
 
@@ -202,16 +203,16 @@ export class HooksManager {
     }
     
     const patterns = [
-      { pattern: /rm\s+-rf\s+\/(?:\s|$)/, message: 'Destructive command on root directory' },
-      { pattern: /rm\s+-rf\s+~/, message: 'Destructive command on home directory' },
-      { pattern: /:\s*\(\s*\)\s*\{.*\}\s*;/, message: 'Fork bomb pattern detected' },
-      { pattern: /curl.*\|\s*(?:bash|sh)/, message: 'Downloading and executing remote code' },
-      { pattern: /wget.*\|\s*(?:bash|sh)/, message: 'Downloading and executing remote code' },
-      { pattern: />\/dev\/sda/, message: 'Direct disk write operation' },
-      { pattern: /sudo\s+/, message: 'Elevated privileges required' },
-      { pattern: /dd\s+.*of=\/dev\//, message: 'Dangerous disk operation' },
-      { pattern: /mkfs\./, message: 'Filesystem formatting command' },
-      { pattern: /:(){ :|:& };:/, message: 'Fork bomb detected' },
+      { pattern: /rm\s+-rf\s+\/(?:\s|$)/, message: translate("Destructive command on root directory") },
+      { pattern: /rm\s+-rf\s+~/, message: translate("Destructive command on home directory") },
+      { pattern: /:\s*\(\s*\)\s*\{.*\}\s*;/, message: translate("Fork bomb pattern detected") },
+      { pattern: /curl.*\|\s*(?:bash|sh)/, message: translate("Downloading and executing remote code") },
+      { pattern: /wget.*\|\s*(?:bash|sh)/, message: translate("Downloading and executing remote code") },
+      { pattern: />\/dev\/sda/, message: translate("Direct disk write operation") },
+      { pattern: /sudo\s+/, message: translate("Elevated privileges required") },
+      { pattern: /dd\s+.*of=\/dev\//, message: translate("Dangerous disk operation") },
+      { pattern: /mkfs\./, message: translate("Filesystem formatting command") },
+      { pattern: /:(){ :|:& };:/, message: translate("Fork bomb detected") },
     ];
 
     for (const { pattern, message } of patterns) {

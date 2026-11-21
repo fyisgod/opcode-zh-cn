@@ -1,3 +1,4 @@
+import { t as translate, useLanguage } from "@/lib/i18n";
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Play, Clock, Hash, Bot } from "lucide-react";
@@ -41,6 +42,7 @@ export const AgentRunsList: React.FC<AgentRunsListProps> = ({
   onRunClick,
   className,
 }) => {
+  useLanguage();
   const [currentPage, setCurrentPage] = useState(1);
   const { createAgentTab } = useTabState();
   
@@ -91,7 +93,7 @@ export const AgentRunsList: React.FC<AgentRunsListProps> = ({
     return (
       <div className={cn("text-center py-8 text-muted-foreground", className)}>
         <Play className="h-8 w-8 mx-auto mb-2 opacity-50" />
-        <p className="text-sm">No execution history yet</p>
+        <p className="text-sm">{translate("No execution history yet")}</p>
       </div>
     );
   }
@@ -133,7 +135,7 @@ export const AgentRunsList: React.FC<AgentRunsListProps> = ({
                         {run.status === "running" && (
                           <div className="flex items-center gap-1">
                             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                            <span className="text-xs text-green-600 font-medium">Running</span>
+                            <span className="text-xs text-green-600 font-medium">{translate("Running")}</span>
                           </div>
                         )}
                       </div>
@@ -171,10 +173,10 @@ export const AgentRunsList: React.FC<AgentRunsListProps> = ({
                         }
                         className="text-xs"
                       >
-                        {run.status === "completed" ? "Completed" :
-                         run.status === "running" ? "Running" :
-                         run.status === "failed" ? "Failed" :
-                         "Pending"}
+                        {run.status === "completed" ? translate("Completed") :
+                         run.status === "running" ? translate("Running") :
+                         run.status === "failed" ? translate("Failed") :
+                         translate("Pending")}
                       </Badge>
                     </div>
                   </div>

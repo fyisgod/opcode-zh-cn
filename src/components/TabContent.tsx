@@ -1,3 +1,4 @@
+import { t as translate, useLanguage } from "@/lib/i18n";
 import React, { Suspense, lazy, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTabState } from '@/hooks/useTabState';
@@ -29,6 +30,7 @@ interface TabPanelProps {
 }
 
 const TabPanel: React.FC<TabPanelProps> = ({ tab, isActive }) => {
+  useLanguage();
   const { updateTab } = useTabState();
   const onStreamingChange = useCallback((isStreaming: boolean) => {
     updateTab(tab.id, { status: isStreaming ? 'running' : 'idle' });
@@ -57,7 +59,7 @@ const TabPanel: React.FC<TabPanelProps> = ({ tab, isActive }) => {
       setProjects(projectList);
     } catch (err) {
       console.error("Failed to load projects:", err);
-      setError("Failed to load projects. Please ensure ~/.claude directory exists.");
+      setError(translate("Failed to load projects. Please ensure ~/.claude directory exists."));
     } finally {
       setLoading(false);
     }
@@ -78,7 +80,7 @@ const TabPanel: React.FC<TabPanelProps> = ({ tab, isActive }) => {
       });
     } catch (err) {
       console.error("Failed to load sessions:", err);
-      setError("Failed to load sessions for this project.");
+      setError(translate("Failed to load sessions for this project."));
     } finally {
       setLoading(false);
     }
@@ -92,7 +94,7 @@ const TabPanel: React.FC<TabPanelProps> = ({ tab, isActive }) => {
       const selected = await open({
         directory: true,
         multiple: false,
-        title: 'Select Project Folder',
+        title: translate("Select Project Folder"),
         defaultPath: await api.getHomeDirectory(),
       });
       
@@ -106,7 +108,7 @@ const TabPanel: React.FC<TabPanelProps> = ({ tab, isActive }) => {
       }
     } catch (err) {
       console.error('Failed to open folder picker:', err);
-      setError('Failed to open folder picker');
+      setError(translate("Failed to open folder picker"));
     }
   };
   
@@ -159,11 +161,11 @@ const TabPanel: React.FC<TabPanelProps> = ({ tab, isActive }) => {
                                 setSessions([]);
                                 // Restore tab title to "Projects"
                                 updateTab(tab.id, {
-                                  title: 'Projects'
+                                  title: translate("Projects")
                                 });
                               }}
                               className="h-8 w-8 -ml-2"
-                              title="Back to Projects"
+                              title={translate("Back to Projects")}
                             >
                               <ArrowLeft className="h-4 w-4" />
                             </Button>
@@ -173,7 +175,7 @@ const TabPanel: React.FC<TabPanelProps> = ({ tab, isActive }) => {
                               {selectedProject.path.split('/').pop()}
                             </h1>
                             <p className="mt-1 text-sm text-muted-foreground">
-                              {`${sessions.length} session${sessions.length !== 1 ? 's' : ''}`}
+                              {translate("{v1} session{v2}", { v1: String(sessions.length), v2: String(sessions.length !== 1 ? 's' : '') })}
                             </p>
                           </div>
                         </div>
@@ -186,7 +188,7 @@ const TabPanel: React.FC<TabPanelProps> = ({ tab, isActive }) => {
                             size="default"
                           >
                             <Plus className="mr-2 h-4 w-4" />
-                            New session
+                            {translate("New session")}
                           </Button>
                         </motion.div>
                       </div>
@@ -220,7 +222,7 @@ const TabPanel: React.FC<TabPanelProps> = ({ tab, isActive }) => {
                           // Update current tab to show the selected session
                           updateTab(tab.id, {
                             type: 'chat',
-                            title: session.project_path.split('/').pop() || 'Session',
+                            title: session.project_path.split('/').pop() || translate("Session"),
                             sessionId: session.id,
                             sessionData: session,
                             initialProjectPath: session.project_path
@@ -268,7 +270,7 @@ const TabPanel: React.FC<TabPanelProps> = ({ tab, isActive }) => {
         if (!tab.agentRunId) {
           return (
             <div className="h-full">
-              <div className="p-4">No agent run ID specified</div>
+              <div className="p-4">{translate("No agent run ID specified")}</div>
             </div>
           );
         }
@@ -318,15 +320,15 @@ const TabPanel: React.FC<TabPanelProps> = ({ tab, isActive }) => {
       
       case 'claude-file':
         if (!tab.claudeFileId) {
-          return <div className="p-4">No Claude file ID specified</div>;
+          return <div className="p-4">{translate("No Claude file ID specified")}</div>;
         }
         // Note: We need to get the actual file object for ClaudeFileEditor
         // For now, returning a placeholder
-        return <div className="p-4">Claude file editor not yet implemented in tabs</div>;
+        return <div className="p-4">{translate("Claude file editor not yet implemented in tabs")}</div>;
       
       case 'agent-execution':
         if (!tab.agentData) {
-          return <div className="p-4">No agent data specified</div>;
+          return <div className="p-4">{translate("No agent data specified")}</div>;
         }
         return (
           <AgentExecution
@@ -355,14 +357,14 @@ const TabPanel: React.FC<TabPanelProps> = ({ tab, isActive }) => {
         // TODO: Implement import agent component
         return (
           <div className="h-full">
-            <div className="p-4">Import agent functionality coming soon...</div>
+            <div className="p-4">{translate("Import agent functionality coming soon...")}</div>
           </div>
         );
       
       default:
         return (
           <div className="h-full">
-            <div className="p-4">Unknown tab type: {tab.type}</div>
+            <div className="p-4">{translate("Unknown tab type:")} {tab.type}</div>
           </div>
         );
     }
@@ -393,6 +395,7 @@ const TabPanel: React.FC<TabPanelProps> = ({ tab, isActive }) => {
 };
 
 export const TabContent: React.FC<{ emptyState?: React.ReactNode }> = ({ emptyState }) => {
+  useLanguage();
   const { tabs, activeTabId, createChatTab, findTabBySessionId, createClaudeFileTab, createAgentExecutionTab, createCreateAgentTab, createImportAgentTab, closeTab, updateTab } = useTabState();
   
   // Listen for events to open sessions in tabs
@@ -406,7 +409,7 @@ export const TabContent: React.FC<{ emptyState?: React.ReactNode }> = ({ emptySt
         // Update existing tab with session data and switch to it
         updateTab(existingTab.id, {
           sessionData: session,
-          title: session.project_path.split('/').pop() || 'Session'
+          title: session.project_path.split('/').pop() || translate("Session")
         });
         window.dispatchEvent(new CustomEvent('switch-to-tab', { detail: { tabId: existingTab.id } }));
       } else {
@@ -452,7 +455,7 @@ export const TabContent: React.FC<{ emptyState?: React.ReactNode }> = ({ emptySt
         // If tab exists, just switch to it
         updateTab(existingTab.id, {
           sessionData: session,
-          title: session.project_path.split('/').pop() || 'Session',
+          title: session.project_path.split('/').pop() || translate("Session"),
         });
         window.dispatchEvent(new CustomEvent('switch-to-tab', { detail: { tabId: existingTab.id } }));
       } else {
@@ -462,7 +465,7 @@ export const TabContent: React.FC<{ emptyState?: React.ReactNode }> = ({ emptySt
         if (currentTab && currentTab.type === 'projects') {
           updateTab(currentTab.id, {
             type: 'chat',
-            title: session.project_path.split('/').pop() || 'Session',
+            title: session.project_path.split('/').pop() || translate("Session"),
             sessionId: session.id,
             sessionData: session,
             initialProjectPath: session.project_path

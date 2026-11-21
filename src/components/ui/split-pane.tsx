@@ -1,3 +1,4 @@
+import { t as translate, useLanguage } from "@/lib/i18n";
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
 
@@ -55,6 +56,7 @@ export const SplitPane: React.FC<SplitPaneProps> = ({
   onSplitChange,
   className,
 }) => {
+  useLanguage();
   const [splitPosition, setSplitPosition] = useState(initialSplit);
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -180,7 +182,7 @@ export const SplitPane: React.FC<SplitPaneProps> = ({
         onKeyDown={handleKeyDown}
         tabIndex={0}
         role="separator"
-        aria-label="Resize panes"
+        aria-label={translate("Resize panes")}
         aria-valuenow={Math.round(splitPosition)}
         aria-valuemin={0}
         aria-valuemax={100}

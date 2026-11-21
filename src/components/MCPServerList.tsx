@@ -1,3 +1,4 @@
+import { t as translate, useLanguage } from "@/lib/i18n";
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -50,6 +51,7 @@ export const MCPServerList: React.FC<MCPServerListProps> = ({
   onServerRemoved,
   onRefresh,
 }) => {
+  useLanguage();
   const [removingServer, setRemovingServer] = useState<string | null>(null);
   const [testingServer, setTestingServer] = useState<string | null>(null);
   const [expandedServers, setExpandedServers] = useState<Set<string>>(new Set());
@@ -220,7 +222,7 @@ export const MCPServerList: React.FC<MCPServerListProps> = ({
                 {server.status?.running && (
                   <Badge variant="outline" className="gap-1 flex-shrink-0 border-green-500/50 text-green-600 bg-green-500/10">
                     <CheckCircle className="h-3 w-3" />
-                    Running
+                    {translate("Running")}
                   </Badge>
                 )}
               </div>
@@ -237,7 +239,7 @@ export const MCPServerList: React.FC<MCPServerListProps> = ({
                     className="h-6 px-2 text-xs hover:bg-primary/10"
                   >
                     <ChevronDown className="h-3 w-3 mr-1" />
-                    Show full
+                    {translate("Show full")}
                   </Button>
                 </div>
               )}
@@ -252,7 +254,7 @@ export const MCPServerList: React.FC<MCPServerListProps> = ({
               
               {Object.keys(server.env).length > 0 && !isExpanded && (
                 <div className="flex items-center gap-1 text-xs text-muted-foreground pl-9">
-                  <span>Environment variables: {Object.keys(server.env).length}</span>
+                  <span>{translate("Environment variables:")} {Object.keys(server.env).length}</span>
                 </div>
               )}
             </div>
@@ -299,7 +301,7 @@ export const MCPServerList: React.FC<MCPServerListProps> = ({
               {server.command && (
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
-                    <p className="text-xs font-medium text-muted-foreground">Command</p>
+                    <p className="text-xs font-medium text-muted-foreground">{translate("Command")}</p>
                     <div className="flex items-center gap-1">
                       <Button
                         variant="ghost"
@@ -308,7 +310,7 @@ export const MCPServerList: React.FC<MCPServerListProps> = ({
                         className="h-6 px-2 text-xs hover:bg-primary/10"
                       >
                         <Copy className="h-3 w-3 mr-1" />
-                        {isCopied ? "Copied!" : "Copy"}
+                        {isCopied ? translate("Copied!") : translate("Copy")}
                       </Button>
                       <Button
                         variant="ghost"
@@ -317,7 +319,7 @@ export const MCPServerList: React.FC<MCPServerListProps> = ({
                         className="h-6 px-2 text-xs hover:bg-primary/10"
                       >
                         <ChevronUp className="h-3 w-3 mr-1" />
-                        Hide
+                        {translate("Hide")}
                       </Button>
                     </div>
                   </div>
@@ -329,7 +331,7 @@ export const MCPServerList: React.FC<MCPServerListProps> = ({
               
               {server.args && server.args.length > 0 && (
                 <div className="space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground">Arguments</p>
+                  <p className="text-xs font-medium text-muted-foreground">{translate("Arguments")}</p>
                   <div className="text-xs font-mono bg-muted/50 p-2 rounded space-y-1">
                     {server.args.map((arg, idx) => (
                       <div key={idx} className="break-all">
@@ -352,7 +354,7 @@ export const MCPServerList: React.FC<MCPServerListProps> = ({
               
               {Object.keys(server.env).length > 0 && (
                 <div className="space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground">Environment Variables</p>
+                  <p className="text-xs font-medium text-muted-foreground">{translate("Environment Variables")}</p>
                   <div className="text-xs font-mono bg-muted/50 p-2 rounded space-y-1">
                     {Object.entries(server.env).map(([key, value]) => (
                       <div key={key} className="break-all">
@@ -384,9 +386,11 @@ export const MCPServerList: React.FC<MCPServerListProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h3 className="text-base font-semibold">Configured Servers</h3>
+          <h3 className="text-base font-semibold">{translate("Configured Servers")}</h3>
           <p className="text-sm text-muted-foreground">
-            {servers.length} server{servers.length !== 1 ? "s" : ""} configured
+            {servers.length === 1
+              ? translate("{count} server configured", { count: servers.length })
+              : translate("{count} servers configured", { count: servers.length })}
           </p>
         </div>
         <Button
@@ -396,7 +400,7 @@ export const MCPServerList: React.FC<MCPServerListProps> = ({
           className="gap-2 hover:bg-primary/10 hover:text-primary hover:border-primary/50"
         >
           <RefreshCw className="h-4 w-4" />
-          Refresh
+          {translate("Refresh")}
         </Button>
       </div>
 
@@ -406,9 +410,9 @@ export const MCPServerList: React.FC<MCPServerListProps> = ({
           <div className="p-4 bg-primary/10 rounded-full mb-4">
             <Network className="h-12 w-12 text-primary" />
           </div>
-          <p className="text-muted-foreground mb-2 font-medium">No MCP servers configured</p>
+          <p className="text-muted-foreground mb-2 font-medium">{translate("No MCP servers configured")}</p>
           <p className="text-sm text-muted-foreground">
-            Add a server to get started with Model Context Protocol
+            {translate("Add a server to get started with Model Context Protocol")}
           </p>
         </div>
       ) : (
@@ -431,4 +435,4 @@ export const MCPServerList: React.FC<MCPServerListProps> = ({
       )}
     </div>
   );
-}; 
+};

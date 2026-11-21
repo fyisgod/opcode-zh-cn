@@ -1,3 +1,4 @@
+import { t as translate, useLanguage } from "@/lib/i18n";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -82,6 +83,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
   onStreamingChange,
   onProjectPathChange,
 }) => {
+  useLanguage();
   const [projectPath] = useState(initialProjectPath || session?.project_path || "");
   const [messages, setMessages] = useState<ClaudeStreamMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -364,7 +366,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
       }, 100);
     } catch (err) {
       console.error("Failed to load session history:", err);
-      setError("Failed to load session history");
+      setError(translate("Failed to load session history"));
     } finally {
       setIsLoading(false);
     }
@@ -467,7 +469,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
     console.log('[ClaudeCodeSession] handleSendPrompt called with:', { prompt, model, projectPath, claudeSessionId, effectiveSession });
     
     if (!projectPath) {
-      setError("Please select a project directory first");
+      setError(translate("Please select a project directory first"));
       return;
     }
 
@@ -879,7 +881,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
       // Surface the backend's reason (e.g. "Project directory not found: ...")
       // instead of hiding it behind a generic message.
       const detail = typeof err === "string" ? err : err instanceof Error ? err.message : "";
-      setError(detail ? `Failed to send prompt: ${detail}` : "Failed to send prompt");
+      setError(detail ? translate("Failed to send prompt: {v1}", { v1: String(detail) }) : translate("Failed to send prompt"));
       setIsLoading(false);
       hasActiveSessionRef.current = false;
     }
@@ -1127,7 +1129,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
       setForkSessionName("");
     } catch (err) {
       console.error("Failed to fork checkpoint:", err);
-      setError("Failed to fork checkpoint");
+      setError(translate("Failed to fork checkpoint"));
     } finally {
       setIsLoading(false);
     }
@@ -1354,7 +1356,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
                 <div className="flex h-full min-h-0 flex-col items-center justify-center gap-5 text-center">
                   <Terminal className="size-9 shrink-0 text-muted-foreground" aria-hidden="true" />
                   <h1 className="max-w-full break-words text-xl font-medium sm:text-2xl">
-                    {name ? <>What should we work on in {name}?</> : 'New chat'}
+                    {name ? <>{translate("What should we work on in")} {name}?</> : translate("New chat")}
                   </h1>
                 </div>
               ) : messagesList}
@@ -1364,7 +1366,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
                   <div className="flex items-center gap-3">
                     <div className="rotating-symbol text-primary" />
                     <span className="text-sm text-muted-foreground">
-                      {session ? "Loading session history..." : "Initializing Claude Code..."}
+                      {session ? translate("Loading session history...") : translate("Initializing Claude Code...")}
                     </span>
                   </div>
                 </div>
@@ -1387,9 +1389,9 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
                 <div className="bg-background/95 backdrop-blur-md border rounded-lg shadow-lg p-3 space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="text-xs font-medium text-muted-foreground mb-1">
-                      Queued Prompts ({queuedPrompts.length})
+                      {translate("Queued Prompts (")}{queuedPrompts.length})
                     </div>
-                    <TooltipSimple content={queuedPromptsCollapsed ? "Expand queue" : "Collapse queue"} side="top">
+                    <TooltipSimple content={queuedPromptsCollapsed ? translate("Expand queue") : translate("Collapse queue")} side="top">
                       <motion.div
                         whileTap={{ scale: 0.97 }}
                         transition={{ duration: 0.15 }}
@@ -1448,7 +1450,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
               className="absolute bottom-32 right-6 z-30"
             >
               <div className="flex items-center bg-background/95 backdrop-blur-md border rounded-full shadow-lg overflow-hidden">
-                <TooltipSimple content="Scroll to top" side="top">
+                <TooltipSimple content={translate("Scroll to top")} side="top">
                   <motion.div
                     whileTap={{ scale: 0.97 }}
                     transition={{ duration: 0.15 }}
@@ -1486,7 +1488,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
                   </motion.div>
                 </TooltipSimple>
                 <div className="w-px h-4 bg-border" />
-                <TooltipSimple content="Scroll to bottom" side="top">
+                <TooltipSimple content={translate("Scroll to bottom")} side="top">
                   <motion.div
                     whileTap={{ scale: 0.97 }}
                     transition={{ duration: 0.15 }}
@@ -1530,9 +1532,9 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
               <div className="flex h-8 items-center justify-between gap-2 px-2 text-xs text-muted-foreground">
                 <span className="flex min-w-0 items-center gap-2" title={projectPath}>
                   <FolderOpen className="size-4 shrink-0" aria-hidden="true" />
-                  <span className="truncate">{name || 'No project selected'}</span>
+                  <span className="truncate">{name || translate("No project selected")}</span>
                 </span>
-                {totalTokens > 0 && <span className="shrink-0">{totalTokens.toLocaleString()} tokens</span>}
+                {totalTokens > 0 && <span className="shrink-0">{totalTokens.toLocaleString()} {translate("tokens")}</span>}
               </div>
             <FloatingPromptInput
               ref={floatingPromptRef}
@@ -1545,7 +1547,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
               extraMenuItems={
                 <>
                   {effectiveSession && (
-                    <TooltipSimple content="Session Timeline" side="top">
+                    <TooltipSimple content={translate("Session Timeline")} side="top">
                       <motion.div
                         whileTap={{ scale: 0.97 }}
                         transition={{ duration: 0.15 }}
@@ -1564,7 +1566,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
                   {messages.length > 0 && (
                     <Popover
                       trigger={
-                        <TooltipSimple content="Copy conversation" side="top">
+                        <TooltipSimple content={translate("Copy conversation")} side="top">
                           <motion.div
                             whileTap={{ scale: 0.97 }}
                             transition={{ duration: 0.15 }}
@@ -1587,7 +1589,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
                             onClick={handleCopyAsMarkdown}
                             className="w-full justify-start text-xs"
                           >
-                            Copy as Markdown
+                            {translate("Copy as Markdown")}
                           </Button>
                           <Button
                             variant="ghost"
@@ -1595,7 +1597,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
                             onClick={handleCopyAsJsonl}
                             className="w-full justify-start text-xs"
                           >
-                            Copy as JSONL
+                            {translate("Copy as JSONL")}
                           </Button>
                         </div>
                       }
@@ -1605,7 +1607,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
                       align="end"
                     />
                   )}
-                  <TooltipSimple content="Checkpoint Settings" side="top">
+                  <TooltipSimple content={translate("Checkpoint Settings")} side="top">
                     <motion.div
                       whileTap={{ scale: 0.97 }}
                       transition={{ duration: 0.15 }}
@@ -1640,7 +1642,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
               <div className="h-full flex flex-col">
                 {/* Timeline Header */}
                 <div className="flex items-center justify-between p-4 border-b border-border">
-                  <h3 className="text-lg font-semibold">Session Timeline</h3>
+                  <h3 className="text-lg font-semibold">{translate("Session Timeline")}</h3>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -1674,18 +1676,18 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
       <Dialog open={showForkDialog} onOpenChange={setShowForkDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Fork Session</DialogTitle>
+            <DialogTitle>{translate("Fork Session")}</DialogTitle>
             <DialogDescription>
-              Create a new session branch from the selected checkpoint.
+              {translate("Create a new session branch from the selected checkpoint.")}
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="fork-name">New Session Name</Label>
+              <Label htmlFor="fork-name">{translate("New Session Name")}</Label>
               <Input
                 id="fork-name"
-                placeholder="e.g., Alternative approach"
+                placeholder={translate("e.g., Alternative approach")}
                 value={forkSessionName}
                 onChange={(e) => setForkSessionName(e.target.value)}
                 onKeyDown={(e) => {
@@ -1708,13 +1710,13 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
               onClick={() => setShowForkDialog(false)}
               disabled={isLoading}
             >
-              Cancel
+              {translate("Cancel")}
             </Button>
             <Button
               onClick={handleConfirmFork}
               disabled={isLoading || !forkSessionName.trim()}
             >
-              Create Fork
+              {translate("Create Fork")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1739,9 +1741,9 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
         <Dialog open={showSlashCommandsSettings} onOpenChange={setShowSlashCommandsSettings}>
           <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
             <DialogHeader>
-              <DialogTitle>Slash Commands</DialogTitle>
+              <DialogTitle>{translate("Slash Commands")}</DialogTitle>
               <DialogDescription>
-                Manage project-specific slash commands for {projectPath}
+                {translate("Manage project-specific slash commands for")} {projectPath}
               </DialogDescription>
             </DialogHeader>
             <div className="flex-1 overflow-y-auto">

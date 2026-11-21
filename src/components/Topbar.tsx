@@ -1,3 +1,4 @@
+import { t as translate, useLanguage } from "@/lib/i18n";
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Circle, ExternalLink } from "lucide-react";
@@ -52,6 +53,7 @@ export const Topbar: React.FC<TopbarProps> = ({
   onSettingsClick,
   className,
 }) => {
+  useLanguage();
   const [versionStatus, setVersionStatus] = useState<ClaudeVersionStatus | null>(null);
   const [checking, setChecking] = useState(true);
   
@@ -87,7 +89,7 @@ export const Topbar: React.FC<TopbarProps> = ({
       return (
         <div className="flex items-center space-x-2 text-xs">
           <Circle className="h-3 w-3 animate-pulse text-muted-foreground" />
-          <span className="text-muted-foreground">Checking...</span>
+          <span className="text-muted-foreground">{translate("Checking...")}</span>
         </div>
       );
     }
@@ -125,7 +127,7 @@ export const Topbar: React.FC<TopbarProps> = ({
           trigger={statusContent}
           content={
             <div className="space-y-3 max-w-xs">
-              <p className="text-sm font-medium">Claude Code not found</p>
+              <p className="text-sm font-medium">{translate("Claude Code not found")}</p>
               <div className="rounded-md bg-muted p-3">
                 <pre className="text-xs font-mono whitespace-pre-wrap">
                   {versionStatus.output}
@@ -137,7 +139,7 @@ export const Topbar: React.FC<TopbarProps> = ({
                 className="w-full"
                 onClick={onSettingsClick}
               >
-                Select Claude Installation
+                {translate("Select Claude Installation")}
               </Button>
               <a
                 href="https://www.anthropic.com/claude-code"
@@ -145,7 +147,7 @@ export const Topbar: React.FC<TopbarProps> = ({
                 rel="noopener noreferrer"
                 className="flex items-center space-x-1 text-xs text-primary hover:underline"
               >
-                <span>Install Claude Code</span>
+                <span>{translate("Install Claude Code")}</span>
                 <ExternalLink className="h-3 w-3" />
               </a>
             </div>

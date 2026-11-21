@@ -1,3 +1,5 @@
+import { t as translate, useLanguage } from "@/lib/i18n";
+import { getTabDisplayTitle } from "@/lib/tab-title";
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { X, Plus, MessageSquare, Bot, AlertCircle, Loader2, Folder, BarChart, Server, Settings, FileText } from 'lucide-react';
@@ -16,6 +18,8 @@ interface TabItemProps {
 }
 
 const TabItem: React.FC<TabItemProps> = ({ tab, isActive, onClose, onClick, isDragging = false, setDraggedTabId }) => {
+  useLanguage();
+  const title = getTabDisplayTitle(tab);
   const [isHovered, setIsHovered] = useState(false);
   
   const getIcon = () => {
@@ -88,7 +92,7 @@ const TabItem: React.FC<TabItemProps> = ({ tab, isActive, onClose, onClick, isDr
       
       {/* Tab Title */}
       <span className="flex-1 truncate text-xs font-medium min-w-0">
-        {tab.title}
+        {title}
       </span>
 
       {/* Status Indicators - always takes up space */}
@@ -102,7 +106,7 @@ const TabItem: React.FC<TabItemProps> = ({ tab, isActive, onClose, onClick, isDr
         {tab.hasUnsavedChanges && !statusIcon && (
           <span 
             className="w-1.5 h-1.5 bg-primary rounded-full"
-            title="Unsaved changes"
+            title={translate("Unsaved changes")}
           />
         )}
       </div>
@@ -119,7 +123,7 @@ const TabItem: React.FC<TabItemProps> = ({ tab, isActive, onClose, onClick, isDr
           "focus:outline-none focus:ring-1 focus:ring-destructive/50",
           (isHovered || isActive) ? "opacity-100" : "opacity-0"
         )}
-        title={`Close ${tab.title}`}
+        title={translate("Close {v1}", { v1: title })}
         tabIndex={-1}
       >
         <X className="w-3 h-3" />
@@ -135,6 +139,7 @@ interface TabManagerProps {
 }
 
 export const TabManager: React.FC<TabManagerProps> = ({ className, onNewChat }) => {
+  useLanguage();
   const {
     tabs,
     activeTabId,
@@ -317,7 +322,7 @@ export const TabManager: React.FC<TabManagerProps> = ({ className, onNewChat }) 
               "transition-colors duration-200 flex items-center justify-center",
               "bg-background/80 backdrop-blur-sm shadow-sm border border-border/50"
             )}
-            title="Scroll tabs left"
+            title={translate("Scroll tabs left")}
           >
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path d="M15 18l-6-6 6-6" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
@@ -366,8 +371,8 @@ export const TabManager: React.FC<TabManagerProps> = ({ className, onNewChat }) 
                 ? "hover:bg-muted/60 text-muted-foreground hover:text-foreground"
                 : "opacity-50 cursor-not-allowed text-muted-foreground"
             )}
-            title={canAddTab() ? "New chat" : "Maximum tabs reached"}
-            aria-label="New chat tab"
+            title={canAddTab() ? translate("New chat") : translate("Maximum tabs reached")}
+            aria-label={translate("New chat tab")}
           >
             <Plus className="w-4 h-4" />
           </motion.button>
@@ -392,7 +397,7 @@ export const TabManager: React.FC<TabManagerProps> = ({ className, onNewChat }) 
               "transition-colors duration-200 flex items-center justify-center",
               "bg-background/80 backdrop-blur-sm shadow-sm border border-border/50"
             )}
-            title="Scroll tabs right"
+            title={translate("Scroll tabs right")}
           >
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path d="M9 18l6-6-6-6" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />

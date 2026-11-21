@@ -18,7 +18,7 @@ use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::ServeDir;
 use which;
 
-use crate::commands;
+use crate::{commands, process::background_command};
 
 // Find Claude binary for web mode - use bundled binary first
 fn find_claude_binary_web() -> Result<String, String> {
@@ -482,7 +482,7 @@ async fn execute_claude_command(
 
     // Create Claude command
     println!("[TRACE] Creating Claude command...");
-    let mut cmd = Command::new(&claude_path);
+    let mut cmd = Command::from(background_command(&claude_path));
     let args = [
         "-p",
         &prompt,
@@ -594,7 +594,7 @@ async fn continue_claude_command(
         find_claude_binary_web().map_err(|e| format!("Claude binary not found: {}", e))?;
 
     // Create continue command
-    let mut cmd = Command::new(&claude_path);
+    let mut cmd = Command::from(background_command(&claude_path));
     cmd.args([
         "-c", // Continue flag
         "-p",
@@ -681,7 +681,7 @@ async fn resume_claude_command(
 
     // Create resume command
     println!("[resume_claude_command] Creating command...");
-    let mut cmd = Command::new(&claude_path);
+    let mut cmd = Command::from(background_command(&claude_path));
     let args = [
         "--resume",
         &claude_session_id,

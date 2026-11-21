@@ -1,3 +1,4 @@
+import { t as translate } from "@/lib/i18n";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Bot, FolderCode } from "lucide-react";
@@ -162,7 +163,7 @@ function AppContent() {
       setProjects(projectList);
     } catch (err) {
       console.error("Failed to load projects:", err);
-      setError("Failed to load projects. Please ensure ~/.claude directory exists.");
+      setError(translate("Failed to load projects. Please ensure ~/.claude directory exists."));
     } finally {
       setLoading(false);
     }
@@ -180,7 +181,7 @@ function AppContent() {
       setSelectedProject(project);
     } catch (err) {
       console.error("Failed to load sessions:", err);
-      setError("Failed to load sessions for this project.");
+      setError(translate("Failed to load sessions for this project."));
     } finally {
       setLoading(false);
     }
@@ -246,7 +247,7 @@ function AppContent() {
               >
                 <h1 className="text-4xl font-bold tracking-tight">
                   <span className="rotating-symbol"></span>
-                  Welcome to opcode
+                  {translate("Welcome to opcode")}
                 </h1>
               </motion.div>
 
@@ -264,7 +265,7 @@ function AppContent() {
                   >
                     <div className="h-full flex flex-col items-center justify-center p-8">
                       <Bot className="h-16 w-16 mb-4 text-primary" />
-                      <h2 className="text-xl font-semibold">CC Agents</h2>
+                      <h2 className="text-xl font-semibold">{translate("CC Agents")}</h2>
                     </div>
                   </Card>
                 </motion.div>
@@ -281,7 +282,7 @@ function AppContent() {
                   >
                     <div className="h-full flex flex-col items-center justify-center p-8">
                       <FolderCode className="h-16 w-16 mb-4 text-primary" />
-                      <h2 className="text-xl font-semibold">Projects</h2>
+                      <h2 className="text-xl font-semibold">{translate("Projects")}</h2>
                     </div>
                   </Card>
                 </motion.div>
@@ -405,7 +406,7 @@ function AppContent() {
         open={showClaudeBinaryDialog}
         onOpenChange={setShowClaudeBinaryDialog}
         onSuccess={() => {
-          setToast({ message: "Claude binary path saved successfully", type: "success" });
+          setToast({ message: translate("Claude binary path saved successfully"), type: "success" });
           // Trigger a refresh of the Claude version check
           window.location.reload();
         }}
@@ -428,7 +429,7 @@ function AppContent() {
                     await handleProjectClick(project);
                   } catch (err) {
                     console.error('Failed to create project:', err);
-                    setError('Failed to create project for the selected directory.');
+                    setError(translate("Failed to create project for the selected directory."));
                   }
                 }
               }}
@@ -466,7 +467,7 @@ function AppContent() {
                     await handleProjectClick(project);
                   } catch (err) {
                     console.error('Failed to create project:', err);
-                    setError('Failed to create project for the selected directory.');
+                    setError(translate("Failed to create project for the selected directory."));
                   }
                 }
               }}

@@ -1,6 +1,8 @@
+import { t as translate, useLanguage } from "@/lib/i18n";
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Settings, Minus, Square, X, Bot, BarChart3, FileText, Network, Info, MoreVertical } from 'lucide-react';
+import { Settings, Minus, Square, Copy, X, Bot, BarChart3, FileText, Network, Info, MoreVertical } from 'lucide-react';
+import { isTauri } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { TooltipProvider, TooltipSimple } from '@/components/ui/tooltip-modern';
 
@@ -21,6 +23,8 @@ export const CustomTitlebar: React.FC<CustomTitlebarProps> = ({
   onMCPClick,
   onInfoClick
 }) => {
+  useLanguage();
+  const [isMaximized, setIsMaximized] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -34,6 +38,28 @@ export const CustomTitlebar: React.FC<CustomTitlebarProps> = ({
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (!isTauri()) return;
+    const appWindow = getCurrentWindow();
+    let active = true;
+    const syncMaximized = async () => {
+      try {
+        const maximized = await appWindow.isMaximized();
+        if (active) setIsMaximized(maximized);
+      } catch (error) {
+        console.error('Failed to read window state:', error);
+      }
+    };
+    void syncMaximized();
+    const unsubscribe = appWindow.onResized(syncMaximized).catch(error => {
+      console.error('Failed to observe window state:', error);
+    });
+    return () => {
+      active = false;
+      void unsubscribe.then(unlisten => unlisten?.());
+    };
   }, []);
 
   const handleMinimize = async () => {
@@ -80,68 +106,14 @@ export const CustomTitlebar: React.FC<CustomTitlebarProps> = ({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Left side - macOS Traffic Light buttons */}
-      <div className="flex items-center space-x-2 pl-5">
-        <div className="flex items-center space-x-2">
-          {/* Close button */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleClose();
-            }}
-            className="group relative w-3 h-3 rounded-full bg-red-500 hover:bg-red-600 transition-all duration-200 flex items-center justify-center tauri-no-drag"
-            title="Close"
-          >
-            {isHovered && (
-              <X size={8} className="text-red-900 opacity-60 group-hover:opacity-100" />
-            )}
-          </button>
-
-          {/* Minimize button */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleMinimize();
-            }}
-            className="group relative w-3 h-3 rounded-full bg-yellow-500 hover:bg-yellow-600 transition-all duration-200 flex items-center justify-center tauri-no-drag"
-            title="Minimize"
-          >
-            {isHovered && (
-              <Minus size={8} className="text-yellow-900 opacity-60 group-hover:opacity-100" />
-            )}
-          </button>
-
-          {/* Maximize button */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleMaximize();
-            }}
-            className="group relative w-3 h-3 rounded-full bg-green-500 hover:bg-green-600 transition-all duration-200 flex items-center justify-center tauri-no-drag"
-            title="Maximize"
-          >
-            {isHovered && (
-              <Square size={6} className="text-green-900 opacity-60 group-hover:opacity-100" />
-            )}
-          </button>
-        </div>
-      </div>
-
-      {/* Center - Title (hidden) */}
-      {/* <div 
-        className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none"
-        data-tauri-drag-region
-      >
-        <span className="text-sm font-medium text-foreground/80">{title}</span>
-      </div> */}
-
-      {/* Right side - Navigation icons with improved spacing */}
-      <div className="flex items-center pr-5 gap-3 tauri-no-drag">
+      {/* Application actions */}
+      <div className="flex items-center pl-5 pr-2 gap-3 tauri-no-drag">
         {/* Primary actions group */}
         <div className="flex items-center gap-1">
           {onAgentsClick && (
-            <TooltipSimple content="Agents" side="bottom">
+            <TooltipSimple content={translate("Agents")} side="bottom">
               <motion.button
+                aria-label={translate("Agents")}
                 onClick={onAgentsClick}
                 whileTap={{ scale: 0.97 }}
                 transition={{ duration: 0.15 }}
@@ -153,8 +125,9 @@ export const CustomTitlebar: React.FC<CustomTitlebarProps> = ({
           )}
           
           {onUsageClick && (
-            <TooltipSimple content="Usage Dashboard" side="bottom">
+            <TooltipSimple content={translate("Usage Dashboard")} side="bottom">
               <motion.button
+                aria-label={translate("Usage Dashboard")}
                 onClick={onUsageClick}
                 whileTap={{ scale: 0.97 }}
                 transition={{ duration: 0.15 }}
@@ -172,8 +145,9 @@ export const CustomTitlebar: React.FC<CustomTitlebarProps> = ({
         {/* Secondary actions group */}
         <div className="flex items-center gap-1">
           {onSettingsClick && (
-            <TooltipSimple content="Settings" side="bottom">
+            <TooltipSimple content={translate("Settings")} side="bottom">
               <motion.button
+                aria-label={translate("Settings")}
                 onClick={onSettingsClick}
                 whileTap={{ scale: 0.97 }}
                 transition={{ duration: 0.15 }}
@@ -186,8 +160,10 @@ export const CustomTitlebar: React.FC<CustomTitlebarProps> = ({
 
           {/* Dropdown menu for additional options */}
           <div className="relative" ref={dropdownRef}>
-            <TooltipSimple content="More options" side="bottom">
+            <TooltipSimple content={translate("More options")} side="bottom">
               <motion.button
+                aria-label={translate("More options")}
+                aria-expanded={isDropdownOpen}
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                 whileTap={{ scale: 0.97 }}
                 transition={{ duration: 0.15 }}
@@ -198,7 +174,7 @@ export const CustomTitlebar: React.FC<CustomTitlebarProps> = ({
             </TooltipSimple>
 
             {isDropdownOpen && (
-              <div className="absolute right-0 mt-2 w-48 bg-popover border border-border rounded-lg shadow-lg z-[250]">
+              <div className="absolute left-0 mt-2 w-48 bg-popover border border-border rounded-lg shadow-lg z-[250]">
                 <div className="py-1">
                   {onClaudeClick && (
                     <button
@@ -222,7 +198,7 @@ export const CustomTitlebar: React.FC<CustomTitlebarProps> = ({
                       className="w-full px-4 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground transition-colors flex items-center gap-3"
                     >
                       <Network size={14} />
-                      <span>MCP Servers</span>
+                      <span>{translate("MCP Servers")}</span>
                     </button>
                   )}
                   
@@ -235,7 +211,7 @@ export const CustomTitlebar: React.FC<CustomTitlebarProps> = ({
                       className="w-full px-4 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground transition-colors flex items-center gap-3"
                     >
                       <Info size={14} />
-                      <span>About</span>
+                      <span>{translate("About")}</span>
                     </button>
                   )}
                 </div>
@@ -244,6 +220,54 @@ export const CustomTitlebar: React.FC<CustomTitlebarProps> = ({
           </div>
         </div>
       </div>
+      <div className="h-full flex-1 tauri-drag" data-tauri-drag-region />
+      {isTauri() && (
+        <div className="flex h-full shrink-0 items-center gap-2 pr-5 pl-2 tauri-no-drag">
+          {/* Minimize button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleMinimize();
+            }}
+            className="group relative w-3 h-3 rounded-full bg-yellow-500 hover:bg-yellow-600 transition-all duration-200 flex items-center justify-center tauri-no-drag"
+            title={translate("Minimize")}
+          >
+            {isHovered && (
+              <Minus size={8} className="text-yellow-900 opacity-60 group-hover:opacity-100" />
+            )}
+          </button>
+
+          {/* Maximize button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleMaximize();
+            }}
+            className="group relative w-3 h-3 rounded-full bg-green-500 hover:bg-green-600 transition-all duration-200 flex items-center justify-center tauri-no-drag"
+            title={isMaximized ? translate("Restore") : translate("Maximize")}
+          >
+            {isHovered && (
+              isMaximized
+                ? <Copy size={7} className="text-green-900 opacity-60 group-hover:opacity-100" />
+                : <Square size={7} className="text-green-900 opacity-60 group-hover:opacity-100" />
+            )}
+          </button>
+
+          {/* Close button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleClose();
+            }}
+            className="group relative w-3 h-3 rounded-full bg-red-500 hover:bg-red-600 transition-all duration-200 flex items-center justify-center tauri-no-drag"
+            title={translate("Close")}
+          >
+            {isHovered && (
+              <X size={8} className="text-red-900 opacity-60 group-hover:opacity-100" />
+            )}
+          </button>
+        </div>
+      )}
     </div>
     </TooltipProvider>
   );

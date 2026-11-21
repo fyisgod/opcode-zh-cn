@@ -1,3 +1,5 @@
+import { getLanguage, t as translate } from "./i18n";
+
 /**
  * Formats a Unix timestamp to a human-readable date string
  * @param timestamp - Unix timestamp in seconds
@@ -8,6 +10,7 @@
  */
 export function formatUnixTimestamp(timestamp: number): string {
   const date = new Date(timestamp * 1000);
+  if (Number.isNaN(date.getTime())) return translate("Invalid Date");
   const now = new Date();
   
   // If it's today, show time
@@ -17,7 +20,7 @@ export function formatUnixTimestamp(timestamp: number): string {
   
   // If it's yesterday
   if (isYesterday(date)) {
-    return `Yesterday, ${formatTime(date)}`;
+    return translate("Yesterday, {time}", { time: formatTime(date) });
   }
   
   // If it's within the last week, show day of week
@@ -27,14 +30,14 @@ export function formatUnixTimestamp(timestamp: number): string {
   
   // If it's this year, don't show year
   if (date.getFullYear() === now.getFullYear()) {
-    return date.toLocaleDateString('en-US', { 
+    return date.toLocaleDateString(getLanguage(), {
       month: 'short', 
       day: 'numeric' 
     });
   }
   
   // Otherwise show full date
-  return date.toLocaleDateString('en-US', { 
+  return date.toLocaleDateString(getLanguage(), {
     month: 'short', 
     day: 'numeric',
     year: 'numeric'
@@ -77,10 +80,10 @@ export function getFirstLine(text: string): string {
 
 // Helper functions
 function formatTime(date: Date): string {
-  return date.toLocaleTimeString('en-US', { 
+  return date.toLocaleTimeString(getLanguage(), {
     hour: 'numeric', 
     minute: '2-digit',
-    hour12: true 
+    hour12: getLanguage() === "en"
   });
 }
 
@@ -102,7 +105,7 @@ function isWithinWeek(date: Date): boolean {
 }
 
 function getDayName(date: Date): string {
-  return date.toLocaleDateString('en-US', { weekday: 'long' });
+  return date.toLocaleDateString(getLanguage(), { weekday: 'long' });
 }
 
 /**
@@ -126,27 +129,13 @@ export function formatTimeAgo(timestamp: number): string {
   const months = Math.floor(days / 30);
   const years = Math.floor(days / 365);
   
-  if (years > 0) {
-    return years === 1 ? '1 year ago' : `${years} years ago`;
-  }
-  if (months > 0) {
-    return months === 1 ? '1 month ago' : `${months} months ago`;
-  }
-  if (weeks > 0) {
-    return weeks === 1 ? '1 week ago' : `${weeks} weeks ago`;
-  }
-  if (days > 0) {
-    return days === 1 ? '1 day ago' : `${days} days ago`;
-  }
-  if (hours > 0) {
-    return hours === 1 ? '1 hour ago' : `${hours} hours ago`;
-  }
-  if (minutes > 0) {
-    return minutes === 1 ? '1 minute ago' : `${minutes} minutes ago`;
-  }
-  if (seconds > 0) {
-    return seconds === 1 ? '1 second ago' : `${seconds} seconds ago`;
-  }
-  
-  return 'just now';
-} 
+  const format = new Intl.RelativeTimeFormat(getLanguage(), { numeric: "always" });
+  if (years > 0) return format.format(-years, "year");
+  if (months > 0) return format.format(-months, "month");
+  if (weeks > 0) return format.format(-weeks, "week");
+  if (days > 0) return format.format(-days, "day");
+  if (hours > 0) return format.format(-hours, "hour");
+  if (minutes > 0) return format.format(-minutes, "minute");
+  if (seconds > 0) return format.format(-seconds, "second");
+  return translate("just now");
+}

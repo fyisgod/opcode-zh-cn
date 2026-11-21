@@ -1,3 +1,4 @@
+import { t as translate } from "@/lib/i18n";
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import type { StateCreator } from 'zustand';
@@ -76,7 +77,7 @@ const agentStore: StateCreator<
         });
       } catch (error) {
         set({
-          error: error instanceof Error ? error.message : 'Failed to fetch agent runs',
+          error: error instanceof Error ? error.message : translate("Failed to fetch agent runs"),
           isLoadingRuns: false
         });
       }
@@ -97,7 +98,7 @@ const agentStore: StateCreator<
         }));
       } catch (error) {
         set({
-          error: error instanceof Error ? error.message : 'Failed to fetch session output',
+          error: error instanceof Error ? error.message : translate("Failed to fetch session output"),
           isLoadingOutput: false
         });
       }
@@ -120,7 +121,7 @@ const agentStore: StateCreator<
         return run;
       } catch (error) {
         set({
-          error: error instanceof Error ? error.message : 'Failed to create agent run'
+          error: error instanceof Error ? error.message : translate("Failed to create agent run")
         });
         throw error;
       }
@@ -142,7 +143,7 @@ const agentStore: StateCreator<
         }));
       } catch (error) {
         set({
-          error: error instanceof Error ? error.message : 'Failed to cancel agent run'
+          error: error instanceof Error ? error.message : translate("Failed to cancel agent run")
         });
         throw error;
       }
@@ -172,7 +173,7 @@ const agentStore: StateCreator<
         }));
       } catch (error) {
         set({
-          error: error instanceof Error ? error.message : 'Failed to delete agent run'
+          error: error instanceof Error ? error.message : translate("Failed to delete agent run")
         });
         throw error;
       }

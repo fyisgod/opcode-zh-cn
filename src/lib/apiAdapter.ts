@@ -1,3 +1,4 @@
+import { t as translate } from "@/lib/i18n";
 /**
  * API Adapter - Compatibility layer for Tauri vs Web environments
  * 
@@ -376,7 +377,7 @@ async function handleStreamingCommand<T>(command: string, params?: any): Promise
           
           // Dispatch claude-error event for UI error handling
           const errorEvent = new CustomEvent('claude-error', {
-            detail: message.message || 'Unknown error'
+            detail: message.message || translate("Unknown error")
           });
           console.log(`[TRACE] Dispatching claude-error event:`, errorEvent.detail);
           window.dispatchEvent(errorEvent);
@@ -396,7 +397,7 @@ async function handleStreamingCommand<T>(command: string, params?: any): Promise
       
       // Dispatch claude-error event for connection errors
       const errorEvent = new CustomEvent('claude-error', {
-        detail: 'WebSocket connection failed'
+        detail: translate("WebSocket connection failed")
       });
       console.log(`[TRACE] Dispatching claude-error event for WebSocket error`);
       window.dispatchEvent(errorEvent);

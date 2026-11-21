@@ -1,3 +1,4 @@
+import { t as translate } from "@/lib/i18n";
 import * as React from "react";
 import * as SelectPrimitive from "@radix-ui/react-select";
 import { Check, ChevronDown, ChevronUp } from "lucide-react";
@@ -191,7 +192,7 @@ const SimpleSelect: React.FC<SelectProps> = ({
   value,
   onValueChange,
   options,
-  placeholder = "Select an option",
+  placeholder = translate("Select an option"),
   disabled = false,
   className,
 }) => {

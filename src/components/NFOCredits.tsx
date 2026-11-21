@@ -1,3 +1,4 @@
+import { t as translate, useLanguage } from "@/lib/i18n";
 import React, { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Volume2, VolumeX, Github } from "lucide-react";
@@ -22,6 +23,7 @@ interface NFOCreditsProps {
  * <NFOCredits onClose={() => setShowNFO(false)} />
  */
 export const NFOCredits: React.FC<NFOCreditsProps> = ({ onClose }) => {
+  useLanguage();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [isMuted, setIsMuted] = useState(false);
@@ -85,25 +87,25 @@ export const NFOCredits: React.FC<NFOCreditsProps> = ({ onClose }) => {
   // Credits content
   const creditsContent = [
     { type: "header", text: "opcode v0.2.1" },
-    { type: "subheader", text: "[ A STRATEGIC PROJECT BY ASTERISK ]" },
+    { type: "subheader", text: translate("[ A STRATEGIC PROJECT BY ASTERISK ]") },
     { type: "spacer" },
-    { type: "section", title: "━━━ CREDITS ━━━" },
-    { type: "credit", role: "POWERED BY", name: "Anthropic Claude 4" },
-    { type: "credit", role: "CLAUDE CODE", name: "The Ultimate Coding Assistant" },
-    { type: "credit", role: "MCP PROTOCOL", name: "Model Context Protocol" },
+    { type: "section", title: translate("━━━ CREDITS ━━━") },
+    { type: "credit", role: translate("POWERED BY"), name: "Anthropic Claude 4" },
+    { type: "credit", role: "CLAUDE CODE", name: translate("The Ultimate Coding Assistant") },
+    { type: "credit", role: translate("MCP PROTOCOL"), name: translate("Model Context Protocol") },
     { type: "spacer" },
-    { type: "section", title: "━━━ DEPENDENCIES ━━━" },
-    { type: "credit", role: "RUNTIME", name: "Tauri Framework" },
-    { type: "credit", role: "UI FRAMEWORK", name: "React + TypeScript" },
-    { type: "credit", role: "STYLING", name: "Tailwind CSS + shadcn/ui" },
-    { type: "credit", role: "ANIMATIONS", name: "Framer Motion" },
-    { type: "credit", role: "BUILD TOOL", name: "Vite" },
-    { type: "credit", role: "PACKAGE MANAGER", name: "Bun" },
+    { type: "section", title: translate("━━━ DEPENDENCIES ━━━") },
+    { type: "credit", role: translate("RUNTIME"), name: "Tauri Framework" },
+    { type: "credit", role: translate("UI FRAMEWORK"), name: "React + TypeScript" },
+    { type: "credit", role: translate("STYLING"), name: "Tailwind CSS + shadcn/ui" },
+    { type: "credit", role: translate("ANIMATIONS"), name: "Framer Motion" },
+    { type: "credit", role: translate("BUILD TOOL"), name: "Vite" },
+    { type: "credit", role: translate("PACKAGE MANAGER"), name: "Bun" },
     { type: "spacer" },
-    { type: "section", title: "━━━ SPECIAL THANKS ━━━" },
-    { type: "text", content: "To the open source community" },
-    { type: "text", content: "To all the beta testers" },
-    { type: "text", content: "To everyone who believed in this project" },
+    { type: "section", title: translate("━━━ SPECIAL THANKS ━━━") },
+    { type: "text", content: translate("To the open source community") },
+    { type: "text", content: translate("To all the beta testers") },
+    { type: "text", content: translate("To everyone who believed in this project") },
     { type: "spacer" },
     { type: "ascii", content: `
      ▄▄▄· .▄▄ · ▄▄▄▄▄▄▄▄ .▄▄▄  ▪  .▄▄ · ▄ •▄ 
@@ -113,8 +115,8 @@ export const NFOCredits: React.FC<NFOCreditsProps> = ({ onClose }) => {
      ▀  ▀  ▀▀▀▀  ▀▀▀  ▀▀▀ .▀  ▀▀▀▀ ▀▀▀▀ ·▀  ▀
     ` },
     { type: "spacer" },
-    { type: "text", content: "Remember: Sharing is caring!" },
-    { type: "text", content: "Support the developers!" },
+    { type: "text", content: translate("Remember: Sharing is caring!") },
+    { type: "text", content: translate("Support the developers!") },
     { type: "spacer" },
     { type: "spacer" },
     { type: "spacer" },
@@ -159,10 +161,10 @@ export const NFOCredits: React.FC<NFOCreditsProps> = ({ onClose }) => {
                     await openUrl("https://github.com/getAsterisk/opcode/issues/new");
                   }}
                   className="flex items-center gap-1 h-auto px-2 py-1"
-                  title="File a bug"
+                  title={translate("File a bug")}
                 >
                   <Github className="h-3 w-3" />
-                  <span className="text-xs">File a bug</span>
+                  <span className="text-xs">{translate("File a bug")}</span>
                 </Button>
                 <Button
                   variant="ghost"
@@ -207,7 +209,7 @@ export const NFOCredits: React.FC<NFOCreditsProps> = ({ onClose }) => {
                   />
                 </button>
                 <div className="text-muted-foreground text-sm font-mono mt-2 tracking-wider">
-                  A strategic project by Asterisk
+                  {translate("A strategic project by Asterisk")}
                 </div>
               </div>
               

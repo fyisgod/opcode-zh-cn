@@ -1,3 +1,4 @@
+import { t as translate, useLanguage } from "@/lib/i18n";
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -88,6 +89,7 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
   onBack,
   className,
 }) => {
+  useLanguage();
   const [projectPath] = useState(initialProjectPath || "");
   const [task, setTask] = useState(agent.default_task || "");
   const [model, setModel] = useState(agent.model || "sonnet");
@@ -350,7 +352,7 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
         const duration = executionStartTime ? Date.now() - executionStartTime : undefined;
         setExecutionStartTime(null);
         if (!event.payload) {
-          setError("Agent execution failed");
+          setError(translate("Agent execution failed"));
           // Update tab status to error
           if (tabId) {
             updateTabStatus(tabId, 'error');
@@ -375,7 +377,7 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
       const cancelUnlisten = await listen<boolean>(`agent-cancelled:${executionRunId}`, () => {
         setIsRunning(false);
         setExecutionStartTime(null);
-        setError("Agent execution was cancelled");
+        setError(translate("Agent execution was cancelled"));
         // Update tab status to idle when cancelled
         if (tabId) {
           updateTabStatus(tabId, 'idle');
@@ -445,7 +447,7 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
     if (isRunning) {
       // Show confirmation dialog before navigating away during execution
       const shouldLeave = window.confirm(
-        "An agent is currently running. If you navigate away, the agent will continue running in the background. You can view running sessions in the 'Running Sessions' tab within CC Agents.\n\nDo you want to continue?"
+        translate("An agent is currently running. If you navigate away, the agent will continue running in the background. You can view running sessions in the 'Running Sessions' tab within CC Agents.\n\nDo you want to continue?")
       );
       if (!shouldLeave) {
         return;
@@ -546,14 +548,14 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
                 size="icon"
                 onClick={handleBackWithConfirmation}
                 className="h-9 w-9 -ml-2"
-                title="Back"
+                title={translate("Back")}
               >
                 <ArrowLeft className="h-4 w-4" />
               </Button>
               <div>
                 <h1 className="text-heading-1">{agent.name}</h1>
                 <p className="mt-1 text-body-small text-muted-foreground">
-                  {isRunning ? 'Running' : messages.length > 0 ? 'Complete' : 'Ready'} • {model === 'opus' ? 'Claude 4 Opus' : 'Claude 4 Sonnet'}
+                  {isRunning ? translate("Running") : messages.length > 0 ? translate("Complete") : translate("Ready")} • {model === 'opus' ? 'Claude 4 Opus' : 'Claude 4 Sonnet'}
                 </p>
               </div>
             </div>
@@ -565,7 +567,7 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
                   onClick={() => setIsFullscreenModalOpen(true)}
                 >
                   <Maximize2 className="h-4 w-4 mr-2" />
-                  Fullscreen
+                  {translate("Fullscreen")}
                 </Button>
               )}
             </div>
@@ -591,7 +593,7 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
 
             {/* Model Selection */}
             <div className="space-y-3">
-              <Label className="text-caption text-muted-foreground">Model Selection</Label>
+              <Label className="text-caption text-muted-foreground">{translate("Model Selection")}</Label>
               <div className="flex gap-2">
                 <motion.button
                   type="button"
@@ -618,7 +620,7 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
                     </div>
                     <div className="text-left">
                       <div className="text-body-small font-medium">Claude 4 Sonnet</div>
-                      <div className="text-caption text-muted-foreground">Faster, efficient</div>
+                      <div className="text-caption text-muted-foreground">{translate("Faster, efficient")}</div>
                     </div>
                   </div>
                 </motion.button>
@@ -648,7 +650,7 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
                     </div>
                     <div className="text-left">
                       <div className="text-body-small font-medium">Claude 4 Opus</div>
-                      <div className="text-caption text-muted-foreground">More capable</div>
+                      <div className="text-caption text-muted-foreground">{translate("More capable")}</div>
                     </div>
                   </div>
                 </motion.button>
@@ -658,7 +660,7 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
             {/* Task Input */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <Label className="text-caption text-muted-foreground">Task Description</Label>
+                <Label className="text-caption text-muted-foreground">{translate("Task Description")}</Label>
                 {projectPath && (
                   <Button
                     variant="ghost"
@@ -668,7 +670,7 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
                     className="h-8 -mr-2"
                   >
                     <Settings2 className="h-3.5 w-3.5 mr-1.5" />
-                    <span className="text-caption">Configure Hooks</span>
+                    <span className="text-caption">{translate("Configure Hooks")}</span>
                   </Button>
                 )}
               </div>
@@ -676,7 +678,7 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
                 <Input
                   value={task}
                   onChange={(e) => setTask(e.target.value)}
-                  placeholder="What would you like the agent to do?"
+                  placeholder={translate("What would you like the agent to do?")}
                   disabled={isRunning}
                   className="flex-1 h-9"
                   onKeyDown={(e) => {
@@ -703,12 +705,12 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
                     {isRunning ? (
                       <>
                         <StopCircle className="mr-2 h-4 w-4" />
-                        Stop
+                        {translate("Stop")}
                       </>
                     ) : (
                       <>
                         <Play className="mr-2 h-4 w-4" />
-                        Execute
+                        {translate("Execute")}
                       </>
                     )}
                   </Button>
@@ -716,7 +718,7 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
               </div>
               {projectPath && (
                 <p className="text-caption text-muted-foreground">
-                  Working in: <span className="font-mono">{projectPath.split('/').pop() || projectPath}</span>
+                  {translate("Working in:")} <span className="font-mono">{projectPath.split('/').pop() || projectPath}</span>
                 </p>
               )}
             </div>
@@ -745,9 +747,9 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
               {messages.length === 0 && !isRunning && (
                 <div className="flex flex-col items-center justify-center h-full text-center">
                   <Terminal className="h-16 w-16 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium mb-2">Ready to Execute</h3>
+                  <h3 className="text-lg font-medium mb-2">{translate("Ready to Execute")}</h3>
                   <p className="text-sm text-muted-foreground">
-                    Enter a task to run the agent
+                    {translate("Enter a task to run the agent")}
                   </p>
                 </div>
               )}
@@ -756,7 +758,7 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
                 <div className="flex items-center justify-center h-full">
                   <div className="flex items-center gap-3">
                     <Loader2 className="h-6 w-6 animate-spin" />
-                    <span className="text-sm text-muted-foreground">Initializing agent...</span>
+                    <span className="text-sm text-muted-foreground">{translate("Initializing agent...")}</span>
                   </div>
                 </div>
               )}
@@ -809,11 +811,11 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
           {/* Modal Header */}
           <div className="flex items-center justify-between p-4 border-b border-border">
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold">{agent.name} - Output</h2>
+              <h2 className="text-lg font-semibold">{agent.name} {translate("- Output")}</h2>
               {isRunning && (
                 <div className="flex items-center gap-1">
                   <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                  <span className="text-xs text-green-600 font-medium">Running</span>
+                  <span className="text-xs text-green-600 font-medium">{translate("Running")}</span>
                 </div>
               )}
             </div>
@@ -826,7 +828,7 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
                     className="flex items-center gap-2"
                   >
                     <Copy className="h-4 w-4" />
-                    Copy Output
+                    {translate("Copy Output")}
                     <ChevronDown className="h-3 w-3" />
                   </Button>
                 }
@@ -838,7 +840,7 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
                       className="w-full justify-start"
                       onClick={handleCopyAsJsonl}
                     >
-                      Copy as JSONL
+                      {translate("Copy as JSONL")}
                     </Button>
                     <Button
                       variant="ghost"
@@ -846,7 +848,7 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
                       className="w-full justify-start"
                       onClick={handleCopyAsMarkdown}
                     >
-                      Copy as Markdown
+                      {translate("Copy as Markdown")}
                     </Button>
                   </div>
                 }
@@ -861,7 +863,7 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
                 className="flex items-center gap-2"
               >
                 <X className="h-4 w-4" />
-                Close
+                {translate("Close")}
               </Button>
             </div>
           </div>
@@ -886,9 +888,9 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
               {messages.length === 0 && !isRunning && (
                 <div className="flex flex-col items-center justify-center h-full text-center">
                   <Terminal className="h-16 w-16 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium mb-2">Ready to Execute</h3>
+                  <h3 className="text-lg font-medium mb-2">{translate("Ready to Execute")}</h3>
                   <p className="text-sm text-muted-foreground">
-                    Enter a task to run the agent
+                    {translate("Enter a task to run the agent")}
                   </p>
                 </div>
               )}
@@ -897,7 +899,7 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
                 <div className="flex items-center justify-center h-full">
                   <div className="flex items-center gap-3">
                     <Loader2 className="h-6 w-6 animate-spin" />
-                    <span className="text-sm text-muted-foreground">Initializing agent...</span>
+                    <span className="text-sm text-muted-foreground">{translate("Initializing agent...")}</span>
                   </div>
                 </div>
               )}
@@ -942,9 +944,9 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
       >
         <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col gap-0 p-0">
           <div className="px-6 py-4 border-b border-border">
-            <DialogTitle className="text-heading-2">Configure Hooks</DialogTitle>
+            <DialogTitle className="text-heading-2">{translate("Configure Hooks")}</DialogTitle>
             <DialogDescription className="mt-1 text-body-small text-muted-foreground">
-              Configure hooks that run before, during, and after tool executions
+              {translate("Configure hooks that run before, during, and after tool executions")}
             </DialogDescription>
           </div>
           
@@ -952,10 +954,10 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
             <div className="px-6 pt-4">
               <TabsList className="grid w-full grid-cols-2 h-auto p-1">
                 <TabsTrigger value="project" className="py-2.5 px-3 text-body-small">
-                  Project Settings
+                  {translate("Project Settings")}
                 </TabsTrigger>
                 <TabsTrigger value="local" className="py-2.5 px-3 text-body-small">
-                  Local Settings
+                  {translate("Local Settings")}
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -964,8 +966,7 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
               <div className="space-y-4 pt-4">
                 <div className="rounded-lg bg-muted/50 p-3">
                   <p className="text-caption text-muted-foreground">
-                    Project hooks are stored in <code className="font-mono text-xs bg-background px-1.5 py-0.5 rounded">.claude/settings.json</code> and 
-                    are committed to version control, allowing team members to share configurations.
+                    {translate("Project hooks are stored in")} <code className="font-mono text-xs bg-background px-1.5 py-0.5 rounded">.claude/settings.json</code> {translate("and are committed to version control, allowing team members to share configurations.")}
                   </p>
                 </div>
                 <HooksEditor
@@ -980,8 +981,7 @@ export const AgentExecution: React.FC<AgentExecutionProps> = ({
               <div className="space-y-4 pt-4">
                 <div className="rounded-lg bg-muted/50 p-3">
                   <p className="text-caption text-muted-foreground">
-                    Local hooks are stored in <code className="font-mono text-xs bg-background px-1.5 py-0.5 rounded">.claude/settings.local.json</code> and 
-                    are not committed to version control, perfect for personal preferences.
+                    {translate("Local hooks are stored in")} <code className="font-mono text-xs bg-background px-1.5 py-0.5 rounded">.claude/settings.local.json</code> {translate("and are not committed to version control, perfect for personal preferences.")}
                   </p>
                 </div>
                 <HooksEditor

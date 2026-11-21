@@ -8,6 +8,9 @@ import { PostHogProvider } from "posthog-js/react";
 import "./assets/shimmer.css";
 import "./styles.css";
 import AppIcon from "./assets/nfo/asterisk-logo.png";
+import { getLanguage } from "./lib/i18n";
+
+document.documentElement.lang = getLanguage();
 
 // Initialize analytics before rendering
 analytics.initialize();

@@ -1,3 +1,4 @@
+import { t as translate, useLanguage } from "@/lib/i18n";
 /**
  * ProjectSettings component for managing project-specific hooks configuration
  */
@@ -33,6 +34,7 @@ export const ProjectSettings: React.FC<ProjectSettingsProps> = ({
   onBack,
   className
 }) => {
+  useLanguage();
   const [activeTab, setActiveTab] = useState('commands');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   
@@ -70,11 +72,11 @@ export const ProjectSettings: React.FC<ProjectSettingsProps> = ({
         content += '\n# Claude local settings (machine-specific)\n.claude/settings.local.json\n';
         await api.saveClaudeMdFile(gitignorePath, content);
         setGitIgnoreLocal(true);
-        setToast({ message: 'Added to .gitignore', type: 'success' });
+        setToast({ message: translate("Added to .gitignore"), type: 'success' });
       }
     } catch (err) {
       console.error('Failed to update .gitignore:', err);
-      setToast({ message: 'Failed to update .gitignore', type: 'error' });
+      setToast({ message: translate("Failed to update .gitignore"), type: 'error' });
     }
   };
 
@@ -86,11 +88,11 @@ export const ProjectSettings: React.FC<ProjectSettingsProps> = ({
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="sm" onClick={onBack}>
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
+              {translate("Back")}
             </Button>
             <div className="flex items-center gap-2">
               <Settings className="h-5 w-5 text-muted-foreground" />
-              <h2 className="text-xl font-semibold">Project Settings</h2>
+              <h2 className="text-xl font-semibold">{translate("Project Settings")}</h2>
             </div>
           </div>
         </div>
@@ -110,15 +112,15 @@ export const ProjectSettings: React.FC<ProjectSettingsProps> = ({
             <TabsList className="mb-6">
               <TabsTrigger value="commands" className="gap-2">
                 <Command className="h-4 w-4" />
-                Slash Commands
+                {translate("Slash Commands")}
               </TabsTrigger>
               <TabsTrigger value="project" className="gap-2">
                 <GitBranch className="h-4 w-4" />
-                Project Hooks
+                {translate("Project Hooks")}
               </TabsTrigger>
               <TabsTrigger value="local" className="gap-2">
                 <Shield className="h-4 w-4" />
-                Local Hooks
+                {translate("Local Hooks")}
               </TabsTrigger>
             </TabsList>
 
@@ -126,11 +128,11 @@ export const ProjectSettings: React.FC<ProjectSettingsProps> = ({
               <Card className="p-6">
                 <div className="space-y-4">
                   <div>
-                    <h3 className="text-lg font-semibold mb-2">Project Slash Commands</h3>
+                    <h3 className="text-lg font-semibold mb-2">{translate("Project Slash Commands")}</h3>
                     <p className="text-sm text-muted-foreground mb-4">
-                      Custom commands that are specific to this project. These commands are stored in
+                      {translate("Custom commands that are specific to this project. These commands are stored in")}
                       <code className="mx-1 px-2 py-1 bg-muted rounded text-xs">.claude/slash-commands/</code>
-                      and can be committed to version control.
+                      {translate("and can be committed to version control.")}
                     </p>
                   </div>
                   
@@ -146,11 +148,11 @@ export const ProjectSettings: React.FC<ProjectSettingsProps> = ({
               <Card className="p-6">
                 <div className="space-y-4">
                   <div>
-                    <h3 className="text-lg font-semibold mb-2">Project Hooks</h3>
+                    <h3 className="text-lg font-semibold mb-2">{translate("Project Hooks")}</h3>
                     <p className="text-sm text-muted-foreground mb-4">
-                      These hooks apply to all users working on this project. They are stored in
+                      {translate("These hooks apply to all users working on this project. They are stored in")}
                       <code className="mx-1 px-2 py-1 bg-muted rounded text-xs">.claude/settings.json</code>
-                      and should be committed to version control.
+                      {translate("and should be committed to version control.")}
                     </p>
                   </div>
                   
@@ -166,11 +168,11 @@ export const ProjectSettings: React.FC<ProjectSettingsProps> = ({
               <Card className="p-6">
                 <div className="space-y-4">
                   <div>
-                    <h3 className="text-lg font-semibold mb-2">Local Hooks</h3>
+                    <h3 className="text-lg font-semibold mb-2">{translate("Local Hooks")}</h3>
                     <p className="text-sm text-muted-foreground mb-4">
-                      These hooks only apply to your machine. They are stored in
+                      {translate("These hooks only apply to your machine. They are stored in")}
                       <code className="mx-1 px-2 py-1 bg-muted rounded text-xs">.claude/settings.local.json</code>
-                      and should NOT be committed to version control.
+                      {translate("and should NOT be committed to version control.")}
                     </p>
                     
                     {!gitIgnoreLocal && (
@@ -178,7 +180,7 @@ export const ProjectSettings: React.FC<ProjectSettingsProps> = ({
                         <AlertTriangle className="h-5 w-5 text-yellow-600" />
                         <div className="flex-1">
                           <p className="text-sm text-yellow-600">
-                            Local settings file is not in .gitignore
+                            {translate("Local settings file is not in .gitignore")}
                           </p>
                         </div>
                         <Button
@@ -186,7 +188,7 @@ export const ProjectSettings: React.FC<ProjectSettingsProps> = ({
                           variant="outline"
                           onClick={addToGitIgnore}
                         >
-                          Add to .gitignore
+                          {translate("Add to .gitignore")}
                         </Button>
                       </div>
                     )}

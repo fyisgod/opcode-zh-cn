@@ -1,3 +1,4 @@
+import { t as translate } from "@/lib/i18n";
 import React from 'react';
 import { motion } from 'framer-motion';
 import { 
@@ -70,7 +71,7 @@ export const SessionHeader: React.FC<SessionHeaderProps> = React.memo(({
           
           <div className="flex items-center gap-2">
             <Terminal className="h-5 w-5 text-primary" />
-            <span className="font-semibold">Claude Code Session</span>
+            <span className="font-semibold">{translate("Claude Code Session")}</span>
           </div>
 
           
@@ -82,7 +83,7 @@ export const SessionHeader: React.FC<SessionHeaderProps> = React.memo(({
               className="flex items-center gap-2"
             >
               <FolderOpen className="h-4 w-4" />
-              Select Project
+              {translate("Select Project")}
             </Button>
           )}
         </div>
@@ -96,7 +97,7 @@ export const SessionHeader: React.FC<SessionHeaderProps> = React.memo(({
               </Badge>
               {totalTokens > 0 && (
                 <Badge variant="secondary" className="text-xs">
-                  {totalTokens.toLocaleString()} tokens
+                  {totalTokens.toLocaleString()} {translate("tokens")}
                 </Badge>
               )}
             </div>
@@ -119,7 +120,7 @@ export const SessionHeader: React.FC<SessionHeaderProps> = React.memo(({
                     className="w-full justify-start"
                     onClick={onCopyAsJsonl}
                   >
-                    Copy as JSONL
+                    {translate("Copy as JSONL")}
                   </Button>
                   <Button
                     variant="ghost"
@@ -127,7 +128,7 @@ export const SessionHeader: React.FC<SessionHeaderProps> = React.memo(({
                     className="w-full justify-start"
                     onClick={onCopyAsMarkdown}
                   >
-                    Copy as Markdown
+                    {translate("Copy as Markdown")}
                   </Button>
                 </div>
               }
@@ -157,13 +158,13 @@ export const SessionHeader: React.FC<SessionHeaderProps> = React.memo(({
               {onProjectSettings && projectPath && (
                 <DropdownMenuItem onClick={onProjectSettings}>
                   <Settings className="h-4 w-4 mr-2" />
-                  Project Settings
+                  {translate("Project Settings")}
                 </DropdownMenuItem>
               )}
               {onSlashCommandsSettings && projectPath && (
                 <DropdownMenuItem onClick={onSlashCommandsSettings}>
                   <Command className="h-4 w-4 mr-2" />
-                  Slash Commands
+                  {translate("Slash Commands")}
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>

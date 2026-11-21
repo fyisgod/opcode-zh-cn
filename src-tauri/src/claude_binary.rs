@@ -1,3 +1,4 @@
+use crate::process::background_command;
 use anyhow::Result;
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
@@ -170,7 +171,7 @@ fn discover_system_installations() -> Vec<ClaudeInstallation> {
 fn try_which_command() -> Option<ClaudeInstallation> {
     debug!("Trying 'which claude' to find binary...");
 
-    match Command::new("which").arg("claude").output() {
+    match background_command("which").arg("claude").output() {
         Ok(output) if output.status.success() => {
             let output_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
 
@@ -214,7 +215,7 @@ fn try_which_command() -> Option<ClaudeInstallation> {
 fn try_which_command() -> Option<ClaudeInstallation> {
     debug!("Trying 'where claude' to find binary...");
 
-    match Command::new("where").arg("claude").output() {
+    match background_command("where").arg("claude").output() {
         Ok(output) if output.status.success() => {
             let output_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
 
@@ -412,7 +413,7 @@ fn find_standard_installations() -> Vec<ClaudeInstallation> {
     }
 
     // Also check if claude is available in PATH (without full path)
-    if let Ok(output) = Command::new("claude").arg("--version").output() {
+    if let Ok(output) = background_command("claude").arg("--version").output() {
         if output.status.success() {
             debug!("claude is available in PATH");
             let version = extract_version_from_output(&output.stdout);
@@ -481,7 +482,7 @@ fn find_standard_installations() -> Vec<ClaudeInstallation> {
     }
 
     // Also check if claude is available in PATH (without full path)
-    if let Ok(output) = Command::new("claude.exe").arg("--version").output() {
+    if let Ok(output) = background_command("claude.exe").arg("--version").output() {
         if output.status.success() {
             debug!("claude.exe is available in PATH");
             let version = extract_version_from_output(&output.stdout);
@@ -500,7 +501,7 @@ fn find_standard_installations() -> Vec<ClaudeInstallation> {
 
 /// Get Claude version by running --version command
 fn get_claude_version(path: &str) -> Result<Option<String>, String> {
-    match Command::new(path).arg("--version").output() {
+    match background_command(path).arg("--version").output() {
         Ok(output) => {
             if output.status.success() {
                 Ok(extract_version_from_output(&output.stdout))
@@ -619,7 +620,7 @@ fn compare_versions(a: &str, b: &str) -> Ordering {
 /// Helper function to create a Command with proper environment variables
 /// This ensures commands like Claude can find Node.js and other dependencies
 pub fn create_command_with_env(program: &str) -> Command {
-    let mut cmd = Command::new(program);
+    let mut cmd = background_command(program);
 
     info!("Creating command for: {}", program);
 

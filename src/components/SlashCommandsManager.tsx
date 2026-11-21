@@ -1,3 +1,4 @@
+import { t as translate, useLanguage } from "@/lib/i18n";
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -92,6 +93,7 @@ export const SlashCommandsManager: React.FC<SlashCommandsManagerProps> = ({
   className,
   scopeFilter = 'all',
 }) => {
+  useLanguage();
   const [commands, setCommands] = useState<SlashCommand[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -133,7 +135,7 @@ export const SlashCommandsManager: React.FC<SlashCommandsManagerProps> = ({
       setCommands(loadedCommands);
     } catch (err) {
       console.error("Failed to load slash commands:", err);
-      setError("Failed to load commands");
+      setError(translate("Failed to load commands"));
     } finally {
       setLoading(false);
     }
@@ -190,7 +192,7 @@ export const SlashCommandsManager: React.FC<SlashCommandsManagerProps> = ({
       await loadCommands();
     } catch (err) {
       console.error("Failed to save command:", err);
-      setError(err instanceof Error ? err.message : "Failed to save command");
+      setError(err instanceof Error ? err.message : translate("Failed to save command"));
     } finally {
       setSaving(false);
     }
@@ -213,7 +215,7 @@ export const SlashCommandsManager: React.FC<SlashCommandsManagerProps> = ({
       await loadCommands();
     } catch (err) {
       console.error("Failed to delete command:", err);
-      const errorMessage = err instanceof Error ? err.message : "Failed to delete command";
+      const errorMessage = err instanceof Error ? err.message : translate("Failed to delete command");
       setError(errorMessage);
     } finally {
       setDeleting(false);
@@ -250,7 +252,7 @@ export const SlashCommandsManager: React.FC<SlashCommandsManagerProps> = ({
     setCommandForm(prev => ({
       ...prev,
       name: example.name,
-      description: example.description,
+      description: translate(example.description),
       content: example.content,
       allowedTools: example.allowedTools
     }));
@@ -305,17 +307,17 @@ export const SlashCommandsManager: React.FC<SlashCommandsManagerProps> = ({
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold">
-            {scopeFilter === 'project' ? 'Project Slash Commands' : 'Slash Commands'}
+            {scopeFilter === 'project' ? translate("Project Slash Commands") : translate("Slash Commands")}
           </h3>
           <p className="text-sm text-muted-foreground mt-1">
             {scopeFilter === 'project' 
-              ? 'Create custom commands for this project' 
-              : 'Create custom commands to streamline your workflow'}
+              ? translate("Create custom commands for this project")
+              : translate("Create custom commands to streamline your workflow")}
           </p>
         </div>
         <Button onClick={handleCreateNew} size="sm" className="gap-2">
           <Plus className="h-4 w-4" />
-          New Command
+          {translate("New Command")}
         </Button>
       </div>
 
@@ -325,7 +327,7 @@ export const SlashCommandsManager: React.FC<SlashCommandsManagerProps> = ({
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search commands..."
+              placeholder={translate("Search commands...")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9"
@@ -338,9 +340,9 @@ export const SlashCommandsManager: React.FC<SlashCommandsManagerProps> = ({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Commands</SelectItem>
-              <SelectItem value="project">Project</SelectItem>
-              <SelectItem value="user">User</SelectItem>
+              <SelectItem value="all">{translate("All Commands")}</SelectItem>
+              <SelectItem value="project">{translate("Project")}</SelectItem>
+              <SelectItem value="user">{translate("User")}</SelectItem>
             </SelectContent>
           </Select>
         )}
@@ -365,16 +367,16 @@ export const SlashCommandsManager: React.FC<SlashCommandsManagerProps> = ({
             <Command className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <p className="text-sm text-muted-foreground">
               {searchQuery 
-                ? "No commands found" 
+                ? translate("No commands found")
                 : scopeFilter === 'project' 
-                  ? "No project commands created yet" 
-                  : "No commands created yet"}
+                  ? translate("No project commands created yet")
+                  : translate("No commands created yet")}
             </p>
             {!searchQuery && (
               <Button onClick={handleCreateNew} variant="outline" size="sm" className="mt-4">
                 {scopeFilter === 'project' 
-                  ? "Create your first project command" 
-                  : "Create your first command"}
+                  ? translate("Create your first project command")
+                  : translate("Create your first command")}
               </Button>
             )}
           </div>
@@ -407,7 +409,7 @@ export const SlashCommandsManager: React.FC<SlashCommandsManagerProps> = ({
                               </code>
                               {command.accepts_arguments && (
                                 <Badge variant="secondary" className="text-xs">
-                                  Arguments
+                                  {translate("Arguments")}
                                 </Badge>
                               )}
                             </div>
@@ -433,7 +435,7 @@ export const SlashCommandsManager: React.FC<SlashCommandsManagerProps> = ({
                               
                               {command.has_file_references && (
                                 <Badge variant="outline" className="text-xs">
-                                  Files
+                                  {translate("Files")}
                                 </Badge>
                               )}
                               
@@ -444,12 +446,12 @@ export const SlashCommandsManager: React.FC<SlashCommandsManagerProps> = ({
                                 {isExpanded ? (
                                   <>
                                     <ChevronDown className="h-3 w-3" />
-                                    Hide content
+                                    {translate("Hide content")}
                                   </>
                                 ) : (
                                   <>
                                     <ChevronRight className="h-3 w-3" />
-                                    Show content
+                                    {translate("Show content")}
                                   </>
                                 )}
                               </button>
@@ -508,14 +510,14 @@ export const SlashCommandsManager: React.FC<SlashCommandsManagerProps> = ({
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {editingCommand ? "Edit Command" : "Create New Command"}
+              {editingCommand ? translate("Edit Command") : translate("Create New Command")}
             </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
             {/* Scope */}
             <div className="space-y-2">
-              <Label>Scope</Label>
+              <Label>{translate("Scope")}</Label>
               <Select 
                 value={commandForm.scope} 
                 onValueChange={(value: 'project' | 'user') => setCommandForm(prev => ({ ...prev, scope: value }))}
@@ -529,7 +531,7 @@ export const SlashCommandsManager: React.FC<SlashCommandsManagerProps> = ({
                     <SelectItem value="user">
                       <div className="flex items-center gap-2">
                         <Globe className="h-4 w-4" />
-                        User (Global)
+                        {translate("User (Global)")}
                       </div>
                     </SelectItem>
                   )}
@@ -537,7 +539,7 @@ export const SlashCommandsManager: React.FC<SlashCommandsManagerProps> = ({
                     <SelectItem value="project" disabled={!projectPath}>
                       <div className="flex items-center gap-2">
                         <FolderOpen className="h-4 w-4" />
-                        Project
+                        {translate("Project")}
                       </div>
                     </SelectItem>
                   )}
@@ -545,26 +547,26 @@ export const SlashCommandsManager: React.FC<SlashCommandsManagerProps> = ({
               </Select>
               <p className="text-xs text-muted-foreground">
                 {commandForm.scope === 'user' 
-                  ? "Available across all projects" 
-                  : "Only available in this project"}
+                  ? translate("Available across all projects")
+                  : translate("Only available in this project")}
               </p>
             </div>
 
             {/* Name and Namespace */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Command Name*</Label>
+                <Label>{translate("Command Name*")}</Label>
                 <Input
-                  placeholder="e.g., review, fix-issue"
+                  placeholder={translate("e.g., review, fix-issue")}
                   value={commandForm.name}
                   onChange={(e) => setCommandForm(prev => ({ ...prev, name: e.target.value }))}
                 />
               </div>
               
               <div className="space-y-2">
-                <Label>Namespace (Optional)</Label>
+                <Label>{translate("Namespace (Optional)")}</Label>
                 <Input
-                  placeholder="e.g., frontend, backend"
+                  placeholder={translate("e.g., frontend, backend")}
                   value={commandForm.namespace}
                   onChange={(e) => setCommandForm(prev => ({ ...prev, namespace: e.target.value }))}
                 />
@@ -573,9 +575,9 @@ export const SlashCommandsManager: React.FC<SlashCommandsManagerProps> = ({
 
             {/* Description */}
             <div className="space-y-2">
-              <Label>Description (Optional)</Label>
+              <Label>{translate("Description (Optional)")}</Label>
               <Input
-                placeholder="Brief description of what this command does"
+                placeholder={translate("Brief description of what this command does")}
                 value={commandForm.description}
                 onChange={(e) => setCommandForm(prev => ({ ...prev, description: e.target.value }))}
               />
@@ -583,22 +585,21 @@ export const SlashCommandsManager: React.FC<SlashCommandsManagerProps> = ({
 
             {/* Content */}
             <div className="space-y-2">
-              <Label>Command Content*</Label>
+              <Label>{translate("Command Content*")}</Label>
               <Textarea
-                placeholder="Enter the prompt content. Use $ARGUMENTS for dynamic values."
+                placeholder={translate("Enter the prompt content. Use $ARGUMENTS for dynamic values.")}
                 value={commandForm.content}
                 onChange={(e) => setCommandForm(prev => ({ ...prev, content: e.target.value }))}
                 className="min-h-[150px] font-mono text-sm"
               />
               <p className="text-xs text-muted-foreground">
-                Use <code>$ARGUMENTS</code> for user input, <code>@filename</code> for files, 
-                and <code>!`command`</code> for bash commands
+                {translate("Use")} <code>$ARGUMENTS</code> {translate("for user input,")} <code>@filename</code> {translate("for files, and")} <code>!`command`</code> {translate("for bash commands")}
               </p>
             </div>
 
             {/* Allowed Tools */}
             <div className="space-y-2">
-              <Label>Allowed Tools</Label>
+              <Label>{translate("Allowed Tools")}</Label>
               <div className="flex flex-wrap gap-2">
                 {COMMON_TOOL_MATCHERS.map((tool) => (
                   <Button
@@ -613,14 +614,14 @@ export const SlashCommandsManager: React.FC<SlashCommandsManagerProps> = ({
                 ))}
               </div>
               <p className="text-xs text-muted-foreground">
-                Select which tools Claude can use with this command
+                {translate("Select which tools Claude can use with this command")}
               </p>
             </div>
 
             {/* Examples */}
             {!editingCommand && (
               <div className="space-y-2">
-                <Label>Examples</Label>
+                <Label>{translate("Examples")}</Label>
                 <div className="grid grid-cols-2 gap-2">
                   {EXAMPLE_COMMANDS.map((example) => (
                     <Button
@@ -641,7 +642,7 @@ export const SlashCommandsManager: React.FC<SlashCommandsManagerProps> = ({
             {/* Preview */}
             {commandForm.name && (
               <div className="space-y-2">
-                <Label>Preview</Label>
+                <Label>{translate("Preview")}</Label>
                 <div className="p-3 bg-muted rounded-md">
                   <code className="text-sm">
                     /
@@ -656,7 +657,7 @@ export const SlashCommandsManager: React.FC<SlashCommandsManagerProps> = ({
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
-              Cancel
+              {translate("Cancel")}
             </Button>
             <Button
               onClick={handleSave}
@@ -665,12 +666,12 @@ export const SlashCommandsManager: React.FC<SlashCommandsManagerProps> = ({
               {saving ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Saving...
+                  {translate("Saving...")}
                 </>
               ) : (
                 <>
                   <Save className="h-4 w-4 mr-2" />
-                  Save
+                  {translate("Save")}
                 </>
               )}
             </Button>
@@ -682,11 +683,11 @@ export const SlashCommandsManager: React.FC<SlashCommandsManagerProps> = ({
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Delete Command</DialogTitle>
+            <DialogTitle>{translate("Delete Command")}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            <p>Are you sure you want to delete this command?</p>
+            <p>{translate("Are you sure you want to delete this command?")}</p>
             {commandToDelete && (
               <div className="p-3 bg-muted rounded-md">
                 <code className="text-sm font-mono">{commandToDelete.full_command}</code>
@@ -696,13 +697,13 @@ export const SlashCommandsManager: React.FC<SlashCommandsManagerProps> = ({
               </div>
             )}
             <p className="text-sm text-muted-foreground">
-              This action cannot be undone. The command file will be permanently deleted.
+              {translate("This action cannot be undone. The command file will be permanently deleted.")}
             </p>
           </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={cancelDelete} disabled={deleting}>
-              Cancel
+              {translate("Cancel")}
             </Button>
             <Button
               variant="destructive"
@@ -712,12 +713,12 @@ export const SlashCommandsManager: React.FC<SlashCommandsManagerProps> = ({
               {deleting ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Deleting...
+                  {translate("Deleting...")}
                 </>
               ) : (
                 <>
                   <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
+                  {translate("Delete")}
                 </>
               )}
             </Button>

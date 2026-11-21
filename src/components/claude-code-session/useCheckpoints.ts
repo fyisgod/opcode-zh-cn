@@ -1,3 +1,4 @@
+import { t as translate } from "@/lib/i18n";
 import { useState, useCallback } from 'react';
 import { api } from '@/lib/api';
 
@@ -38,7 +39,7 @@ export function useCheckpoints({ sessionId, projectId, projectPath, onToast }: U
       const mappedCheckpoints = result.map(cp => ({
         id: cp.id,
         sessionId: cp.sessionId,
-        name: cp.description || `Checkpoint at ${cp.timestamp}`,
+        name: cp.description || translate("Checkpoint at {v1}", { v1: String(cp.timestamp) }),
         createdAt: cp.timestamp,
         messageCount: cp.metadata.totalTokens
       }));

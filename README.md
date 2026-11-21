@@ -20,6 +20,7 @@
   </p>
 </div>
 
+> **Modified edition (2026-11-21):** This repository is based on [Opcode](https://github.com/winfunc/opcode). It adds a Simplified Chinese interface, a project sidebar layout, and Windows background-process handling. This edition is licensed under the GNU Affero General Public License, version 3. See [LICENSE](LICENSE).
 
 
 https://github.com/user-attachments/assets/6bceea0f-60b6-4c3e-a745-b891de00b8d0

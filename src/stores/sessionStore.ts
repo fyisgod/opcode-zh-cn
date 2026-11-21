@@ -1,3 +1,4 @@
+import { t as translate } from "@/lib/i18n";
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import type { StateCreator } from 'zustand';
@@ -56,7 +57,7 @@ const sessionStore: StateCreator<
         set({ projects, isLoadingProjects: false });
       } catch (error) {
         set({ 
-          error: error instanceof Error ? error.message : 'Failed to fetch projects',
+          error: error instanceof Error ? error.message : translate("Failed to fetch projects"),
           isLoadingProjects: false 
         });
       }
@@ -76,7 +77,7 @@ const sessionStore: StateCreator<
         }));
       } catch (error) {
         set({ 
-          error: error instanceof Error ? error.message : 'Failed to fetch sessions',
+          error: error instanceof Error ? error.message : translate("Failed to fetch sessions"),
           isLoadingSessions: false 
         });
       }
@@ -115,7 +116,7 @@ const sessionStore: StateCreator<
         }));
       } catch (error) {
         set({ 
-          error: error instanceof Error ? error.message : 'Failed to fetch session output',
+          error: error instanceof Error ? error.message : translate("Failed to fetch session output"),
           isLoadingOutputs: false 
         });
       }
@@ -141,7 +142,7 @@ const sessionStore: StateCreator<
         }));
       } catch (error) {
         set({ 
-          error: error instanceof Error ? error.message : 'Failed to delete session'
+          error: error instanceof Error ? error.message : translate("Failed to delete session")
         });
         throw error;
       }

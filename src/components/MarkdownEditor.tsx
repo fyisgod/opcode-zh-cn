@@ -1,5 +1,6 @@
+import { t as translate, useLanguage } from "@/lib/i18n";
 import React, { useState, useEffect } from "react";
-import MDEditor from "@uiw/react-md-editor";
+import { LocalizedMarkdownEditor } from "./LocalizedMarkdownEditor";
 import { motion } from "framer-motion";
 import { Save, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,7 @@ interface MarkdownEditorProps {
 export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
   className,
 }) => {
+  useLanguage();
   const [content, setContent] = useState<string>("");
   const [originalContent, setOriginalContent] = useState<string>("");
   const [loading, setLoading] = useState(true);
@@ -50,7 +52,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
       setOriginalContent(prompt);
     } catch (err) {
       console.error("Failed to load system prompt:", err);
-      setError("Failed to load CLAUDE.md file");
+      setError(translate("Failed to load CLAUDE.md file"));
     } finally {
       setLoading(false);
     }
@@ -63,11 +65,11 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
       setToast(null);
       await api.saveSystemPrompt(content);
       setOriginalContent(content);
-      setToast({ message: "CLAUDE.md saved successfully", type: "success" });
+      setToast({ message: translate("CLAUDE.md saved successfully"), type: "success" });
     } catch (err) {
       console.error("Failed to save system prompt:", err);
-      setError("Failed to save CLAUDE.md file");
-      setToast({ message: "Failed to save CLAUDE.md", type: "error" });
+      setError(translate("Failed to save CLAUDE.md file"));
+      setToast({ message: translate("Failed to save CLAUDE.md"), type: "error" });
     } finally {
       setSaving(false);
     }
@@ -83,7 +85,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
             <div>
               <h1 className="text-3xl font-bold tracking-tight">CLAUDE.md</h1>
               <p className="mt-1 text-sm text-muted-foreground">
-                Edit your Claude Code system prompt
+                {translate("Edit your Claude Code system prompt")}
               </p>
             </div>
             <Button
@@ -94,12 +96,12 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
               {saving ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
+                  {translate("Saving...")}
                 </>
               ) : (
                 <>
                   <Save className="mr-2 h-4 w-4" />
-                  Save
+                  {translate("Save")}
                 </>
               )}
             </Button>
@@ -126,7 +128,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
             </div>
           ) : (
             <div className="h-full rounded-lg border border-border overflow-hidden shadow-sm" data-color-mode="dark">
-              <MDEditor
+              <LocalizedMarkdownEditor
                 value={content}
                 onChange={(val) => setContent(val || "")}
                 preview="edit"
@@ -150,4 +152,4 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
       </ToastContainer>
     </div>
   );
-}; 
+};

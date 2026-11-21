@@ -1,3 +1,4 @@
+import { t as translate } from "@/lib/i18n";
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Clock, Sparkles, Zap } from 'lucide-react';
@@ -34,7 +35,7 @@ export const PromptQueue: React.FC<PromptQueueProps> = React.memo(({
       <div className="px-4 py-3">
         <div className="flex items-center gap-2 mb-2">
           <Clock className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-medium">Queued Prompts</span>
+          <span className="text-sm font-medium">{translate("Queued Prompts")}</span>
           <Badge variant="secondary" className="text-xs">
             {queuedPrompts.length}
           </Badge>

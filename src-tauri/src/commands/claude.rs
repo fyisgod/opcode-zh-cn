@@ -10,6 +10,8 @@ use tauri::{AppHandle, Emitter, Manager};
 use tokio::process::{Child, Command};
 use tokio::sync::Mutex;
 
+use crate::process::background_command;
+
 /// Global state to track current Claude process
 pub struct ClaudeProcessState {
     pub current_process: Arc<Mutex<Option<Child>>>,
@@ -538,11 +540,7 @@ fn extract_first_user_message(jsonl_path: &PathBuf) -> (Option<String>, Option<S
 /// Helper function to create a tokio Command with proper environment variables
 /// This ensures commands like Claude can find Node.js and other dependencies
 fn create_command_with_env(program: &str) -> Command {
-    // Convert std::process::Command to tokio::process::Command
-    let _std_cmd = crate::claude_binary::create_command_with_env(program);
-
-    // Create a new tokio Command from the program path
-    let mut tokio_cmd = Command::new(program);
+    let mut tokio_cmd = Command::from(background_command(program));
 
     // Copy over all environment variables
     for (key, value) in std::env::vars() {
@@ -895,7 +893,7 @@ pub async fn open_new_session(app: AppHandle, path: Option<String>) -> Result<St
 
     #[cfg(debug_assertions)]
     {
-        let mut cmd = std::process::Command::new(claude_path);
+        let mut cmd = background_command(claude_path);
 
         // If a path is provided, use it; otherwise use current directory
         if let Some(project_path) = path {
@@ -973,7 +971,7 @@ pub async fn check_claude_version(app: AppHandle) -> Result<ClaudeVersionStatus,
 
     #[cfg(debug_assertions)]
     {
-        let output = std::process::Command::new(claude_path)
+        let output = background_command(claude_path)
             .arg("--version")
             .output();
 
@@ -1387,11 +1385,11 @@ pub async fn cancel_claude_execution(
                     if let Some(pid) = pid {
                         log::info!("Attempting system kill as last resort for PID: {}", pid);
                         let kill_result = if cfg!(target_os = "windows") {
-                            std::process::Command::new("taskkill")
+                            background_command("taskkill")
                                 .args(["/F", "/PID", &pid.to_string()])
                                 .output()
                         } else {
-                            std::process::Command::new("kill")
+                            background_command("kill")
                                 .args(["-KILL", &pid.to_string()])
                                 .output()
                         };
@@ -2478,7 +2476,7 @@ pub async fn validate_hook_command(command: String) -> Result<serde_json::Value,
     log::info!("Validating hook command syntax");
 
     // Validate syntax without executing
-    let mut cmd = std::process::Command::new("bash");
+    let mut cmd = background_command("bash");
     cmd.arg("-n") // Syntax check only
         .arg("-c")
         .arg(&command);

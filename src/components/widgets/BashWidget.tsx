@@ -1,3 +1,4 @@
+import { t as translate, useLanguage } from "@/lib/i18n";
 import React from "react";
 import { Terminal, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -9,6 +10,7 @@ interface BashWidgetProps {
 }
 
 export const BashWidget: React.FC<BashWidgetProps> = ({ command, description, result }) => {
+  useLanguage();
   // Extract result content if available
   let resultContent = '';
   let isError = false;
@@ -34,7 +36,7 @@ export const BashWidget: React.FC<BashWidgetProps> = ({ command, description, re
     <div className="rounded-lg border bg-background overflow-hidden">
       <div className="px-4 py-2 bg-muted/50 flex items-center gap-2 border-b">
         <Terminal className="h-3.5 w-3.5 text-green-500" />
-        <span className="text-xs font-mono text-muted-foreground">Terminal</span>
+        <span className="text-xs font-mono text-muted-foreground">{translate("Terminal")}</span>
         {description && (
           <>
             <ChevronRight className="h-3 w-3 text-muted-foreground" />
@@ -45,7 +47,7 @@ export const BashWidget: React.FC<BashWidgetProps> = ({ command, description, re
         {!result && (
           <div className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
             <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse" />
-            <span>Running...</span>
+            <span>{translate("Running...")}</span>
           </div>
         )}
       </div>
@@ -62,7 +64,7 @@ export const BashWidget: React.FC<BashWidgetProps> = ({ command, description, re
               ? "border-[color:var(--color-destructive)]/20 bg-[color:var(--color-destructive)]/5 text-[color:var(--color-destructive)]" 
               : "border-[color:var(--color-green-500)]/20 bg-[color:var(--color-green-500)]/5 text-[color:var(--color-green-500)]"
           )}>
-            {resultContent || (isError ? "Command failed" : "Command completed")}
+            {resultContent || (isError ? translate("Command failed") : translate("Command completed"))}
           </div>
         )}
       </div>

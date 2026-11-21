@@ -1,3 +1,5 @@
+import { t as translate } from "@/lib/i18n";
+import { getTabDisplayTitle } from "@/lib/tab-title";
 import { useCallback, useMemo } from 'react';
 import { useTabContext } from '@/contexts/TabContext';
 import { Tab } from '@/contexts/TabContext';
@@ -261,7 +263,7 @@ export const useTabState = (): UseTabStateReturn => {
     // Check for unsaved changes
     if (!force && tab.hasUnsavedChanges) {
       // In a real implementation, you'd show a confirmation dialog here
-      const confirmed = window.confirm(`Tab "${tab.title}" has unsaved changes. Close anyway?`);
+      const confirmed = window.confirm(translate("Tab \"{v1}\" has unsaved changes. Close anyway?", { v1: getTabDisplayTitle(tab) }));
       if (!confirmed) return false;
     }
 

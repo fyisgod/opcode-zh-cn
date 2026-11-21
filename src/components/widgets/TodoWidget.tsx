@@ -1,3 +1,4 @@
+import { t as translate, useLanguage } from "@/lib/i18n";
 import React from "react";
 import { CheckCircle2, Circle, Clock, FileEdit } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +10,7 @@ interface TodoWidgetProps {
 }
 
 export const TodoWidget: React.FC<TodoWidgetProps> = ({ todos, result: _result }) => {
+  useLanguage();
   const statusIcons = {
     completed: <CheckCircle2 className="h-4 w-4 text-green-500" />,
     in_progress: <Clock className="h-4 w-4 text-blue-500 animate-pulse" />,
@@ -25,7 +27,7 @@ export const TodoWidget: React.FC<TodoWidgetProps> = ({ todos, result: _result }
     <div className="space-y-2">
       <div className="flex items-center gap-2 mb-3">
         <FileEdit className="h-4 w-4 text-primary" />
-        <span className="text-sm font-medium">Todo List</span>
+        <span className="text-sm font-medium">{translate("Todo List")}</span>
       </div>
       <div className="space-y-2">
         {todos.map((todo, idx) => (

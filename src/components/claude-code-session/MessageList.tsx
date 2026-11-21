@@ -1,3 +1,4 @@
+import { t as translate } from "@/lib/i18n";
 import React, { useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -78,11 +79,11 @@ export const MessageList: React.FC<MessageListProps> = React.memo(({
             <Terminal className="h-8 w-8 text-primary" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold mb-2">Ready to start coding</h3>
+            <h3 className="text-lg font-semibold mb-2">{translate("Ready to start coding")}</h3>
             <p className="text-sm text-muted-foreground">
               {projectPath 
-                ? "Enter a prompt below to begin your Claude Code session"
-                : "Select a project folder to begin"}
+                ? translate("Enter a prompt below to begin your Claude Code session")
+                : translate("Select a project folder to begin")}
             </p>
           </div>
         </motion.div>
@@ -146,7 +147,7 @@ export const MessageList: React.FC<MessageListProps> = React.memo(({
         >
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <div className="h-2 w-2 bg-primary rounded-full animate-pulse" />
-            <span>Claude is thinking...</span>
+            <span>{translate("Claude is thinking...")}</span>
           </div>
         </motion.div>
       )}

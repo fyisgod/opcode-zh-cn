@@ -1,3 +1,4 @@
+import { t as translate, useLanguage } from "@/lib/i18n";
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -216,6 +217,7 @@ const FloatingPromptInputInner = (
   }: FloatingPromptInputProps,
   ref: React.Ref<FloatingPromptInputRef>,
 ) => {
+  useLanguage();
   const [prompt, setPrompt] = useState("");
   const [selectedModel, setSelectedModel] = useState<"sonnet" | "opus">(defaultModel);
   const [selectedThinkingMode, setSelectedThinkingMode] = useState<ThinkingMode>("auto");
@@ -867,8 +869,8 @@ const FloatingPromptInputInner = (
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium">Compose your prompt</h3>
-                <TooltipSimple content="Minimize" side="bottom">
+                <h3 className="text-sm font-medium">{translate("Compose your prompt")}</h3>
+                <TooltipSimple content={translate("Minimize")} side="bottom">
                   <motion.div
                     whileTap={{ scale: 0.97 }}
                     transition={{ duration: 0.15 }}
@@ -901,7 +903,7 @@ const FloatingPromptInputInner = (
                 onCompositionStart={handleCompositionStart}
                 onCompositionEnd={handleCompositionEnd}
                 onPaste={handlePaste}
-                placeholder="Type your message..."
+                placeholder={translate("Type your message...")}
                 className="min-h-[200px] resize-none"
                 disabled={disabled}
                 onDragEnter={handleDrag}
@@ -913,7 +915,7 @@ const FloatingPromptInputInner = (
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">Model:</span>
+                    <span className="text-xs text-muted-foreground">{translate("Model:")}</span>
                     <Popover
                       trigger={
                         <Button
@@ -951,7 +953,7 @@ const FloatingPromptInputInner = (
                               <div className="flex-1 space-y-1">
                                 <div className="font-medium text-sm">{model.name}</div>
                                 <div className="text-xs text-muted-foreground">
-                                  {model.description}
+                                  {translate(model.description)}
                                 </div>
                               </div>
                             </button>
@@ -966,7 +968,7 @@ const FloatingPromptInputInner = (
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">Thinking:</span>
+                    <span className="text-xs text-muted-foreground">{translate("Thinking:")}</span>
                     <Popover
                       trigger={
                         <Tooltip>
@@ -986,8 +988,8 @@ const FloatingPromptInputInner = (
                               </Button>
                             </TooltipTrigger>
                             <TooltipContent>
-                              <p className="font-medium">{THINKING_MODES.find(m => m.id === selectedThinkingMode)?.name || "Auto"}</p>
-                              <p className="text-xs text-muted-foreground">{THINKING_MODES.find(m => m.id === selectedThinkingMode)?.description}</p>
+                              <p className="font-medium">{translate(THINKING_MODES.find(m => m.id === selectedThinkingMode)?.name ?? "Auto")}</p>
+                              <p className="text-xs text-muted-foreground">{translate(THINKING_MODES.find(m => m.id === selectedThinkingMode)?.description ?? "")}</p>
                             </TooltipContent>
                           </Tooltip>
                       }
@@ -1011,10 +1013,10 @@ const FloatingPromptInputInner = (
                               </span>
                               <div className="flex-1 space-y-1">
                                 <div className="font-medium text-sm">
-                                  {mode.name}
+                                  {translate(mode.name)}
                                 </div>
                                 <div className="text-xs text-muted-foreground">
-                                  {mode.description}
+                                  {translate(mode.description)}
                                 </div>
                               </div>
                               <ThinkingModeIndicator level={mode.level} />
@@ -1030,7 +1032,7 @@ const FloatingPromptInputInner = (
                   </div>
                 </div>
 
-                <TooltipSimple content="Send message" side="top">
+                <TooltipSimple content={translate("Send message")} side="top">
                   <motion.div
                     whileTap={{ scale: 0.97 }}
                     transition={{ duration: 0.15 }}
@@ -1109,7 +1111,7 @@ const FloatingPromptInputInner = (
                         </TooltipTrigger>
                         <TooltipContent side="top">
                           <p className="text-xs font-medium">{selectedModelData.name}</p>
-                          <p className="text-xs text-muted-foreground">{selectedModelData.description}</p>
+                          <p className="text-xs text-muted-foreground">{translate(selectedModelData.description)}</p>
                         </TooltipContent>
                       </Tooltip>
                   }
@@ -1136,7 +1138,7 @@ const FloatingPromptInputInner = (
                         <div className="flex-1 space-y-1">
                           <div className="font-medium text-sm">{model.name}</div>
                           <div className="text-xs text-muted-foreground">
-                            {model.description}
+                            {translate(model.description)}
                           </div>
                         </div>
                       </button>
@@ -1174,8 +1176,8 @@ const FloatingPromptInputInner = (
                           </motion.div>
                         </TooltipTrigger>
                         <TooltipContent side="top">
-                          <p className="text-xs font-medium">Thinking: {THINKING_MODES.find(m => m.id === selectedThinkingMode)?.name || "Auto"}</p>
-                          <p className="text-xs text-muted-foreground">{THINKING_MODES.find(m => m.id === selectedThinkingMode)?.description}</p>
+                          <p className="text-xs font-medium">{translate("Thinking:")} {translate(THINKING_MODES.find(m => m.id === selectedThinkingMode)?.name ?? "Auto")}</p>
+                          <p className="text-xs text-muted-foreground">{translate(THINKING_MODES.find(m => m.id === selectedThinkingMode)?.description ?? "")}</p>
                         </TooltipContent>
                       </Tooltip>
                   }
@@ -1199,10 +1201,10 @@ const FloatingPromptInputInner = (
                         </span>
                         <div className="flex-1 space-y-1">
                           <div className="font-medium text-sm">
-                            {mode.name}
+                            {translate(mode.name)}
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            {mode.description}
+                            {translate(mode.description)}
                           </div>
                         </div>
                         <ThinkingModeIndicator level={mode.level} />
@@ -1230,8 +1232,8 @@ const FloatingPromptInputInner = (
                   onPaste={handlePaste}
                   placeholder={
                     dragActive
-                      ? "Drop images here..."
-                      : "Message Claude (@ for files, / for commands)..."
+                      ? translate("Drop images here...")
+                      : translate("Message Claude (@ for files, / for commands)...")
                   }
                   disabled={disabled}
                   className={cn(
@@ -1247,7 +1249,7 @@ const FloatingPromptInputInner = (
 
                 {/* Action buttons inside input - fixed at bottom right */}
                 <div className="absolute right-1.5 bottom-1.5 flex items-center gap-0.5">
-                  <TooltipSimple content="Expand (Ctrl+Shift+E)" side="top">
+                  <TooltipSimple content={translate("Expand (Ctrl+Shift+E)")} side="top">
                     <motion.div
                       whileTap={{ scale: 0.97 }}
                       transition={{ duration: 0.15 }}
@@ -1264,7 +1266,7 @@ const FloatingPromptInputInner = (
                     </motion.div>
                   </TooltipSimple>
 
-                  <TooltipSimple content={isLoading ? "Stop generation" : "Send message (Enter)"} side="top">
+                  <TooltipSimple content={isLoading ? translate("Stop generation") : translate("Send message (Enter)")} side="top">
                     <motion.div
                       whileTap={{ scale: 0.97 }}
                       transition={{ duration: 0.15 }}

@@ -1,3 +1,4 @@
+import { t as translate, useLanguage } from "@/lib/i18n";
 import React, { useState } from "react";
 import { X, Maximize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -40,6 +41,7 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({
   onRemove,
   className,
 }) => {
+  useLanguage();
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
@@ -89,12 +91,12 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({
               >
                 {imageErrors.has(index) ? (
                   <div className="w-full h-full bg-muted flex items-center justify-center">
-                    <span className="text-xs text-muted-foreground">Error</span>
+                    <span className="text-xs text-muted-foreground">{translate("Error")}</span>
                   </div>
                 ) : (
                   <img
                     src={getImageSrc(imagePath)}
-                    alt={`Preview ${index + 1}`}
+                    alt={translate("Preview {v1}", { v1: String(index + 1) })}
                     className="w-full h-full object-cover"
                     onError={() => handleImageError(index)}
                   />
@@ -137,12 +139,12 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({
         onOpenChange={(open) => !open && setSelectedImageIndex(null)}
       >
         <DialogContent className="max-w-4xl max-h-[90vh] p-0">
-          <DialogTitle className="sr-only">Image Preview</DialogTitle>
+          <DialogTitle className="sr-only">{translate("Image Preview")}</DialogTitle>
           {selectedImageIndex !== null && (
             <div className="relative w-full h-full flex items-center justify-center p-4">
               <img
                 src={getImageSrc(displayImages[selectedImageIndex])}
-                alt={`Full preview ${selectedImageIndex + 1}`}
+                alt={translate("Full preview {v1}", { v1: String(selectedImageIndex + 1) })}
                 className="max-w-full max-h-full object-contain"
                 onError={() => handleImageError(selectedImageIndex)}
               />

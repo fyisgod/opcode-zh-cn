@@ -14,6 +14,8 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::io::{AsyncBufReadExt, BufReader as TokioBufReader};
 use tokio::process::Command;
 
+use crate::process::background_command;
+
 /// Finds the full path to the claude binary
 /// This is necessary because macOS apps have a limited PATH environment
 fn find_claude_binary(app_handle: &AppHandle) -> Result<String, String> {
@@ -1037,7 +1039,7 @@ async fn spawn_agent_system(
                     "🔍 Process likely stuck waiting for input, attempting to kill PID: {}",
                     pid
                 );
-                let kill_result = std::process::Command::new("kill")
+                let kill_result = background_command("kill")
                     .arg("-TERM")
                     .arg(pid.to_string())
                     .output();
@@ -1048,7 +1050,7 @@ async fn spawn_agent_system(
                     }
                     Ok(_) => {
                         warn!("🔍 Failed to kill process with TERM, trying KILL");
-                        let _ = std::process::Command::new("kill")
+                        let _ = background_command("kill")
                             .arg("-KILL")
                             .arg(pid.to_string())
                             .output();
@@ -1294,7 +1296,7 @@ pub async fn cleanup_finished_processes(db: State<'_, AgentDb>) -> Result<Vec<i6
         // Check if the process is still running
         let is_running = if cfg!(target_os = "windows") {
             // On Windows, use tasklist to check if process exists
-            match std::process::Command::new("tasklist")
+            match background_command("tasklist")
                 .args(["/FI", &format!("PID eq {}", pid)])
                 .args(["/FO", "CSV"])
                 .output()
@@ -1307,7 +1309,7 @@ pub async fn cleanup_finished_processes(db: State<'_, AgentDb>) -> Result<Vec<i6
             }
         } else {
             // On Unix-like systems, use kill -0 to check if process exists
-            match std::process::Command::new("kill")
+            match background_command("kill")
                 .args(["-0", &pid.to_string()])
                 .output()
             {
@@ -1642,14 +1644,9 @@ pub async fn list_claude_installations(
 /// Helper function to create a tokio Command with proper environment variables
 /// This ensures commands like Claude can find Node.js and other dependencies
 fn create_command_with_env(program: &str) -> Command {
-    // Convert std::process::Command to tokio::process::Command
-    let _std_cmd = crate::claude_binary::create_command_with_env(program);
+    let mut tokio_cmd = Command::from(background_command(program));
 
-    // Create a new tokio Command from the program path
-    let mut tokio_cmd = Command::new(program);
-
-    // Copy over all environment variables from the std::process::Command
-    // This is a workaround since we can't directly convert between the two types
+    // Copy over environment variables used by Claude.
     for (key, value) in std::env::vars() {
         if key == "PATH"
             || key == "HOME"
