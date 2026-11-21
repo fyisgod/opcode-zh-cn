@@ -564,6 +564,14 @@ html.is-macos body {
   margin-bottom: 1.143em;
 }
 
+.prose.conversation-prose > :first-child {
+  margin-top: 0;
+}
+
+.prose.conversation-prose > :last-child {
+  margin-bottom: 0;
+}
+
 .prose [class~="lead"] {
   font-size: 1.25em;
   line-height: 1.6;

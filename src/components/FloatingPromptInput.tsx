@@ -2,6 +2,7 @@ import { t as translate, useLanguage } from "@/lib/i18n";
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
+  ArrowUp,
   Send,
   Maximize2,
   Minimize2,
@@ -173,6 +174,8 @@ const ThinkingModeIndicator: React.FC<{ level: number; color?: string }> = ({ le
 const BUILTIN_MODELS = [{ model: "sonnet", label: "Sonnet" }, { model: "opus", label: "Opus" }] as const;
 const NO_PROVIDERS: ModelProvider[] = [];
 const modelKey = ({ providerId, model }: ModelSelection) => JSON.stringify([providerId ?? null, model]);
+const modelGroupLabel = "truncate px-2 pt-2 pb-1 text-xs font-medium text-muted-foreground";
+const modelOption = "pl-4 font-medium data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[state=checked]:bg-primary/10 [&>span:last-child]:truncate";
 
 /**
  * FloatingPromptInput component - Fixed position prompt input with model picker
@@ -840,7 +843,7 @@ const FloatingPromptInputInner = (
   const renderModelPicker = (expanded: boolean) => {
     const unavailableLabel = translate("Model unavailable");
     const label = modelUnavailable ? unavailableLabel : modelPending ? translate("Select model")
-      : selectedProvider ? `${selectedProvider.name} / ${selectedModel.model}` : selectedModel.model === "opus" ? "Opus" : "Sonnet";
+      : selectedProvider ? selectedModel.model : selectedModel.model === "opus" ? "Opus" : "Sonnet";
     const title = selectedProvider ? `${selectedProvider.name} / ${selectedModel.model}`
       : modelPending && modelsError ? translate("Could not load model provider settings.") : label;
     const choose = (model: ModelSelection) => (onModelChange ?? setLocalModel)(model);
@@ -854,19 +857,25 @@ const FloatingPromptInputInner = (
         }
       }}>
         <SelectTrigger aria-label={translate("Select model")} title={title}
-          className={cn("gap-1.5 text-xs [&>span]:block [&>span]:min-w-0 [&>span]:truncate", expanded ? "w-40" : "h-9 w-28 px-2 sm:w-36")}>
-          <SelectValue placeholder={label}>{label}</SelectValue>
+          className={cn(
+            "min-w-0 gap-1.5 text-left [&>span]:block [&>span]:min-w-0 [&>svg]:shrink-0",
+            expanded ? "w-40" : "h-9 w-auto max-w-48 rounded-md border-transparent bg-transparent px-2 shadow-none transition-colors hover:bg-accent"
+          )}>
+          <SelectValue placeholder={label}>
+            <span className="block truncate text-xs font-medium leading-tight">{label}</span>
+            {selectedProvider && <span className="block truncate text-xs leading-tight text-muted-foreground">{selectedProvider.name}</span>}
+          </SelectValue>
         </SelectTrigger>
-        <SelectContent className="max-w-[calc(100vw-2rem)] min-w-44">
+        <SelectContent side="top" align="end" className="max-w-[min(22rem,calc(100vw-1.5rem))] min-w-52">
           {modelUnavailable && <SelectItem disabled value={modelKey(selectedModel)}>{unavailableLabel}</SelectItem>}
           <SelectGroup>
-            <SelectLabel>{translate("Built-in models")}</SelectLabel>
-            {BUILTIN_MODELS.map(model => <SelectItem key={model.model} value={modelKey(model)}>{model.label}</SelectItem>)}
+            <SelectLabel className={modelGroupLabel}>{translate("Built-in models")}</SelectLabel>
+            {BUILTIN_MODELS.map(model => <SelectItem className={modelOption} key={model.model} value={modelKey(model)}>{model.label}</SelectItem>)}
           </SelectGroup>
           {activeProviders.map(provider => (
-            <SelectGroup key={provider.id}>
-              <SelectLabel className="truncate" title={provider.name}>{provider.name}</SelectLabel>
-              {provider.models.map(model => <SelectItem key={model} title={model} value={modelKey({ providerId: provider.id, model })}>{model}</SelectItem>)}
+            <SelectGroup key={provider.id} className="mt-1 border-t border-border pt-1">
+              <SelectLabel className={modelGroupLabel} title={provider.name}>{provider.name}</SelectLabel>
+              {provider.models.map(model => <SelectItem className={modelOption} key={model} title={model} value={modelKey({ providerId: provider.id, model })}>{model}</SelectItem>)}
             </SelectGroup>
           ))}
         </SelectContent>
@@ -1036,11 +1045,11 @@ const FloatingPromptInputInner = (
         )}
       </AnimatePresence>
 
-      {/* Fixed Position Input Bar */}
+      {/* Composer */}
       <div
         className={cn(
           embedded
-            ? "relative rounded-lg border border-border bg-card"
+            ? "relative rounded-lg border border-border bg-card focus-within:border-muted-foreground/50"
             : "fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-sm border-t border-border shadow-lg",
           dragActive && "ring-2 ring-primary ring-offset-2",
           className
@@ -1050,20 +1059,38 @@ const FloatingPromptInputInner = (
         onDragOver={handleDrag}
         onDrop={handleDrop}
       >
-        <div className="container mx-auto">
+        <div className="mx-auto w-full max-w-3xl p-2">
           {/* Image previews */}
           {embeddedImages.length > 0 && (
             <ImagePreview
               images={embeddedImages}
               onRemove={handleRemoveImage}
-              className="border-b border-border"
+              className="mb-1"
             />
           )}
 
-          <div className="p-3">
-            <div className="flex items-end gap-2">
-              {/* Model & Thinking Mode Selectors - Left side, fixed at bottom */}
-              <div className="flex items-center gap-1 shrink-0 mb-1">
+          <Textarea
+            ref={textareaRef}
+            value={prompt}
+            onChange={handleTextChange}
+            onKeyDown={handleKeyDown}
+            onCompositionStart={handleCompositionStart}
+            onCompositionEnd={handleCompositionEnd}
+            onPaste={handlePaste}
+            aria-label={translate("Compose your prompt")}
+            placeholder={dragActive ? translate("Drop images here...") : translate("Message Claude (@ for files, / for commands)...")}
+            disabled={disabled}
+            rows={1}
+            className={cn(
+              "resize-none rounded-none border-0 bg-transparent px-2 py-2 leading-relaxed focus-visible:ring-0 focus-visible:ring-offset-0",
+              textareaHeight >= 240 && "scrollbar-thin"
+            )}
+            style={{ height: textareaHeight, overflowY: textareaHeight >= 240 ? 'auto' : 'hidden' }}
+          />
+
+          <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 pt-1">
+            {extraMenuItems && <div className="flex items-center gap-0.5">{extraMenuItems}</div>}
+            <div className="ml-auto flex min-w-0 max-w-full items-center gap-0.5">
                 {renderModelPicker(false)}
 
                 <Popover
@@ -1078,12 +1105,13 @@ const FloatingPromptInputInner = (
                               variant="ghost"
                               size="sm"
                               disabled={disabled}
-                              className="h-9 px-2 hover:bg-accent/50 gap-1"
+                              aria-label={translate("Thinking:")}
+                              className="h-9 gap-1 px-2 text-xs hover:bg-accent/50"
                             >
                               <span className={THINKING_MODES.find(m => m.id === selectedThinkingMode)?.color}>
                                 {THINKING_MODES.find(m => m.id === selectedThinkingMode)?.icon}
                               </span>
-                              <span className="text-[10px] font-semibold opacity-70">
+                              <span className="text-xs font-semibold opacity-70">
                                 {THINKING_MODES.find(m => m.id === selectedThinkingMode)?.shortName}
                               </span>
                               <ChevronUp className="h-3 w-3 ml-0.5 opacity-50" />
@@ -1133,112 +1161,54 @@ const FloatingPromptInputInner = (
                 side="top"
               />
 
-              </div>
-
-              {/* Prompt Input - Center */}
-              <div className="flex-1 relative">
-                <Textarea
-                  ref={textareaRef}
-                  value={prompt}
-                  onChange={handleTextChange}
-                  onKeyDown={handleKeyDown}
-                  onCompositionStart={handleCompositionStart}
-                  onCompositionEnd={handleCompositionEnd}
-                  onPaste={handlePaste}
-                  placeholder={
-                    dragActive
-                      ? translate("Drop images here...")
-                      : translate("Message Claude (@ for files, / for commands)...")
-                  }
+              <TooltipSimple content={translate("Expand (Ctrl+Shift+E)")} side="top">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsExpanded(true)}
                   disabled={disabled}
-                  className={cn(
-                    "resize-none pr-20 pl-3 py-2.5 transition-all duration-150",
-                    dragActive && "border-primary",
-                    textareaHeight >= 240 && "overflow-y-auto scrollbar-thin"
-                  )}
-                  style={{
-                    height: `${textareaHeight}px`,
-                    overflowY: textareaHeight >= 240 ? 'auto' : 'hidden'
-                  }}
-                />
+                  aria-label={translate("Expand (Ctrl+Shift+E)")}
+                  className="size-8 shrink-0 text-muted-foreground hover:text-foreground"
+                >
+                  <Maximize2 className="size-4" />
+                </Button>
+              </TooltipSimple>
 
-                {/* Action buttons inside input - fixed at bottom right */}
-                <div className="absolute right-1.5 bottom-1.5 flex items-center gap-0.5">
-                  <TooltipSimple content={translate("Expand (Ctrl+Shift+E)")} side="top">
-                    <motion.div
-                      whileTap={{ scale: 0.97 }}
-                      transition={{ duration: 0.15 }}
-                    >
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setIsExpanded(true)}
-                        disabled={disabled}
-                        className="h-8 w-8 hover:bg-accent/50 transition-colors"
-                      >
-                        <Maximize2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </motion.div>
-                  </TooltipSimple>
-
-                  <TooltipSimple content={isLoading ? translate("Stop generation") : translate("Send message (Enter)")} side="top">
-                    <motion.div
-                      whileTap={{ scale: 0.97 }}
-                      transition={{ duration: 0.15 }}
-                    >
-                      <Button
-                        onClick={isLoading ? onCancel : handleSend}
-                        disabled={isLoading ? false : (!prompt.trim() || disabled || !canSend)}
-                        variant={isLoading ? "destructive" : prompt.trim() ? "default" : "ghost"}
-                        size="icon"
-                        className={cn(
-                          "h-8 w-8 transition-all",
-                          prompt.trim() && !isLoading && "shadow-sm"
-                        )}
-                      >
-                        {isLoading ? (
-                          <Square className="h-4 w-4" />
-                        ) : (
-                          <Send className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </motion.div>
-                  </TooltipSimple>
-                </div>
-
-                {/* File Picker */}
-                <AnimatePresence>
-                  {showFilePicker && projectPath && projectPath.trim() && (
-                    <FilePicker
-                      basePath={projectPath.trim()}
-                      onSelect={handleFileSelect}
-                      onClose={handleFilePickerClose}
-                      initialQuery={filePickerQuery}
-                    />
-                  )}
-                </AnimatePresence>
-
-                {/* Slash Command Picker */}
-                <AnimatePresence>
-                  {showSlashCommandPicker && (
-                    <SlashCommandPicker
-                      projectPath={projectPath}
-                      onSelect={handleSlashCommandSelect}
-                      onClose={handleSlashCommandPickerClose}
-                      initialQuery={slashCommandQuery}
-                    />
-                  )}
-                </AnimatePresence>
-              </div>
-
-              {/* Extra menu items - Right side, fixed at bottom */}
-              {extraMenuItems && (
-                <div className="flex items-center gap-0.5 shrink-0 mb-1">
-                  {extraMenuItems}
-                </div>
-              )}
+              <TooltipSimple content={isLoading ? translate("Stop generation") : translate("Send message (Enter)")} side="top">
+                <Button
+                  onClick={isLoading ? onCancel : handleSend}
+                  disabled={!isLoading && (!prompt.trim() || disabled || !canSend)}
+                  aria-label={isLoading ? translate("Stop generation") : translate("Send message (Enter)")}
+                  variant={isLoading ? "destructive" : "default"}
+                  size="icon"
+                  className="ml-1 size-8 shrink-0 rounded-full"
+                >
+                  {isLoading ? <Square className="size-3 fill-current" /> : <ArrowUp className="size-4" />}
+                </Button>
+              </TooltipSimple>
             </div>
           </div>
+
+          <AnimatePresence>
+            {showFilePicker && projectPath?.trim() && (
+              <FilePicker
+                basePath={projectPath.trim()}
+                onSelect={handleFileSelect}
+                onClose={handleFilePickerClose}
+                initialQuery={filePickerQuery}
+              />
+            )}
+          </AnimatePresence>
+          <AnimatePresence>
+            {showSlashCommandPicker && (
+              <SlashCommandPicker
+                projectPath={projectPath}
+                onSelect={handleSlashCommandSelect}
+                onClose={handleSlashCommandPickerClose}
+                initialQuery={slashCommandQuery}
+              />
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </>

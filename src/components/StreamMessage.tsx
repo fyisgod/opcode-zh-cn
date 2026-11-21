@@ -47,12 +47,18 @@ interface StreamMessageProps {
   className?: string;
   streamMessages: ClaudeStreamMessage[];
   onLinkDetected?: (url: string) => void;
+  variant?: "conversation";
+}
+
+export function isStreamSummary(message: ClaudeStreamMessage): boolean {
+  const type: string = message.type;
+  return type === "summary" && !!message.leafUuid && !!message.summary;
 }
 
 /**
  * Component to render a single Claude Code stream message
  */
-const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, className, streamMessages, onLinkDetected }) => {
+const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, className, streamMessages, onLinkDetected, variant }) => {
   useLanguage();
   // State to track tool results mapped by tool call ID
   const [toolResults, setToolResults] = useState<Map<string, any>>(new Map());
@@ -92,7 +98,7 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, classNa
     }
 
     // Handle summary messages
-    if (message.leafUuid && message.summary && (message as any).type === "summary") {
+    if (isStreamSummary(message)) {
       return <SummaryWidget summary={message.summary} leafUuid={message.leafUuid} />;
     }
 
@@ -111,14 +117,16 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, classNa
     // Assistant message
     if (message.type === "assistant" && message.message) {
       const msg = message.message;
+      const conversation = variant === "conversation";
+      const MessageFrame = conversation ? "div" : Card;
       
       let renderedSomething = false;
       
       const renderedCard = (
-        <Card className={cn("border-primary/20 bg-primary/5", className)}>
-          <CardContent className="p-4">
+        <MessageFrame className={cn(!conversation && "border-primary/20 bg-primary/5", className)}>
+          <CardContent className={conversation ? "px-0 py-2" : "p-4"}>
             <div className="flex items-start gap-3">
-              <Bot className="h-5 w-5 text-primary mt-0.5" />
+              <Bot className="mt-0.5 size-5 shrink-0 text-primary" />
               <div className="flex-1 space-y-2 min-w-0">
                 {msg.content && Array.isArray(msg.content) && msg.content.map((content: any, idx: number) => {
                   // Text content - render as markdown
@@ -130,7 +138,7 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, classNa
                     
                     renderedSomething = true;
                     return (
-                      <div key={idx} className="prose prose-sm dark:prose-invert max-w-none">
+                      <div key={idx} className={cn("prose prose-sm dark:prose-invert max-w-none", conversation && "conversation-prose wrap-anywhere")}>
                         <ReactMarkdown
                           remarkPlugins={[remarkGfm]}
                           components={{
@@ -310,7 +318,7 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, classNa
               </div>
             </div>
           </CardContent>
-        </Card>
+        </MessageFrame>
       );
       
       if (!renderedSomething) return null;
@@ -324,14 +332,22 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, classNa
 
       // Handle different message structures
       const msg = message.message || message;
+      const bubble = variant === "conversation" && (
+        typeof msg.content === "string" ? !msg.content.includes("<local-command-stdout>") :
+          Array.isArray(msg.content) && msg.content.some(part => part.type === "text") &&
+          !msg.content.some(part => part.type === "tool_result")
+      );
+      const MessageFrame = bubble ? "div" : Card;
       
       let renderedSomething = false;
       
       const renderedCard = (
-        <Card className={cn("border-muted-foreground/20 bg-muted/20", className)}>
-          <CardContent className="p-4">
+        <MessageFrame className={cn(bubble
+          ? "ml-auto w-fit max-w-[88%] rounded-lg bg-muted text-foreground"
+          : "border-muted-foreground/20 bg-muted/20", className)}>
+          <CardContent className={bubble ? "px-4 py-2.5" : "p-4"}>
             <div className="flex items-start gap-3">
-              <User className="h-5 w-5 text-muted-foreground mt-0.5" />
+              <User className={cn("mt-0.5 shrink-0 text-muted-foreground", bubble ? "size-4" : "size-5")} />
               <div className="flex-1 space-y-2 min-w-0">
                 {/* Handle content that is a simple string (e.g. from user commands) */}
                 {(typeof msg.content === 'string' || (msg.content && !Array.isArray(msg.content))) && (
@@ -362,7 +378,7 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, classNa
                     
                     // Otherwise render as plain text
                     return (
-                      <div className="text-sm">
+                      <div className="text-sm whitespace-pre-wrap wrap-anywhere">
                         {contentStr}
                       </div>
                     );
@@ -620,7 +636,7 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, classNa
                     
                     renderedSomething = true;
                     return (
-                      <div key={idx} className="text-sm">
+                      <div key={idx} className="text-sm whitespace-pre-wrap wrap-anywhere">
                         {textContent}
                       </div>
                     );
@@ -631,7 +647,7 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, classNa
               </div>
             </div>
           </CardContent>
-        </Card>
+        </MessageFrame>
       );
       if (!renderedSomething) return null;
       return renderedCard;

@@ -1,6 +1,6 @@
 import { t as translate, useLanguage } from "@/lib/i18n";
 import { initialModel, savedProviderFor, useModelProviders, type ModelSelection } from "@/lib/modelProvider";
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Copy,
@@ -19,7 +19,7 @@ import { Popover } from "@/components/ui/popover";
 import { api, type Session } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { listen, type UnlistenFn } from "@/lib/tauriEvents";
-import { StreamMessage } from "./StreamMessage";
+import { isStreamSummary, StreamMessage } from "./StreamMessage";
 import { FloatingPromptInput, type FloatingPromptInputRef } from "./FloatingPromptInput";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { TimelineNavigator } from "./TimelineNavigator";
@@ -199,6 +199,11 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
         return false;
       }
 
+      // JSONL also contains bookkeeping entries that do not render a message.
+      if (message.type !== "user" && message.type !== "assistant" && message.type !== "result") {
+        return (message.type === "system" && message.subtype === "init") || isStreamSummary(message);
+      }
+
       // Skip user messages that only contain tool results that are already displayed
       if (message.type === "user" && message.message) {
         if (message.isMeta) return false;
@@ -259,6 +264,8 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
     getScrollElement: () => parentRef.current,
     estimateSize: () => 150, // Estimate, will be dynamically measured
     overscan: 5,
+    paddingStart: 24,
+    paddingEnd: 8,
   });
 
   // Debug logging
@@ -297,27 +304,15 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
     onStreamingChange?.(isLoading, claudeSessionId);
   }, [isLoading, claudeSessionId, onStreamingChange]);
 
-  // Auto-scroll to bottom when new messages arrive
-  useEffect(() => {
-    if (displayableMessages.length > 0) {
-      // Use a more precise scrolling method to ensure content is fully visible
-      setTimeout(() => {
-        const scrollElement = parentRef.current;
-        if (scrollElement) {
-          // First, scroll using virtualizer to get close to the bottom
-          rowVirtualizer.scrollToIndex(displayableMessages.length - 1, { align: 'end', behavior: 'auto' });
-
-          // Then use direct scroll to ensure we reach the absolute bottom
-          requestAnimationFrame(() => {
-            scrollElement.scrollTo({
-              top: scrollElement.scrollHeight,
-              behavior: 'smooth'
-            });
-          });
-        }
-      }, 50);
+  // Both restored history and live messages use the same visible row indices.
+  const lastScrolledCount = useRef(0);
+  useLayoutEffect(() => {
+    const count = displayableMessages.length;
+    if (isActive && count !== lastScrolledCount.current) {
+      lastScrolledCount.current = count;
+      if (count > 0) rowVirtualizer.scrollToIndex(count - 1, { align: 'end' });
     }
-  }, [displayableMessages.length, rowVirtualizer]);
+  }, [displayableMessages.length, isActive, rowVirtualizer]);
 
   // Calculate total tokens from messages
   useEffect(() => {
@@ -360,25 +355,6 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
       
       setMessages(loadedMessages);
       setRawJsonlOutput(history.map(h => JSON.stringify(h)));
-      
-      // After loading history, we're continuing a conversation
-      
-      // Scroll to bottom after loading history
-      setTimeout(() => {
-        if (loadedMessages.length > 0) {
-          const scrollElement = parentRef.current;
-          if (scrollElement) {
-            // Use the same improved scrolling method
-            rowVirtualizer.scrollToIndex(loadedMessages.length - 1, { align: 'end', behavior: 'auto' });
-            requestAnimationFrame(() => {
-              scrollElement.scrollTo({
-                top: scrollElement.scrollHeight,
-                behavior: 'auto'
-              });
-            });
-          }
-        }
-      }, 100);
     } catch (err) {
       console.error("Failed to load session history:", err);
       setError(translate("Failed to load session history"));
@@ -1249,44 +1225,28 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
   const messagesList = (
     <div
       ref={parentRef}
-      className="flex-1 overflow-y-auto relative"
-      style={{
-        contain: 'strict',
-      }}
+      className="relative min-h-0 flex-1 overflow-y-auto"
     >
       <div
-        className="relative w-full max-w-6xl mx-auto px-4 pt-8 pb-4"
-        style={{
-          height: `${Math.max(rowVirtualizer.getTotalSize(), 100)}px`,
-          minHeight: '100px',
-        }}
+        className="relative mx-auto w-full max-w-3xl"
+        style={{ height: rowVirtualizer.getTotalSize() }}
       >
-        <AnimatePresence>
-          {rowVirtualizer.getVirtualItems().map((virtualItem) => {
-            const message = displayableMessages[virtualItem.index];
-            return (
-              <motion.div
-                key={virtualItem.key}
-                data-index={virtualItem.index}
-                ref={(el) => el && rowVirtualizer.measureElement(el)}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.3 }}
-                className="absolute inset-x-4 pb-4"
-                style={{
-                  top: virtualItem.start,
-                }}
-              >
-                <StreamMessage 
-                  message={message} 
-                  streamMessages={messages}
-                  onLinkDetected={handleLinkDetected}
-                />
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
+        {rowVirtualizer.getVirtualItems().map((virtualItem) => (
+          <div
+            key={virtualItem.key}
+            data-index={virtualItem.index}
+            ref={rowVirtualizer.measureElement}
+            className="absolute inset-x-3 pb-4 empty:pb-0 sm:inset-x-6"
+            style={{ top: virtualItem.start }}
+          >
+            <StreamMessage
+              message={displayableMessages[virtualItem.index]}
+              streamMessages={messages}
+              onLinkDetected={handleLinkDetected}
+              variant="conversation"
+            />
+          </div>
+        ))}
       </div>
 
       {/* Loading indicator under the latest message */}
@@ -1376,7 +1336,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
             />
           ) : (
             // Original layout when no preview
-            <div className="h-full flex flex-col max-w-6xl mx-auto px-6">
+            <div className="flex h-full flex-col">
               {!session && messages.length === 0 && !isLoading && !error ? (
                 <div className="flex h-full min-h-0 flex-col items-center justify-center gap-5 text-center">
                   <Terminal className="size-9 shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -1402,6 +1362,10 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
 
         {/* Floating Prompt Input - Always visible */}
         <ErrorBoundary>
+          <div className={cn(
+            "relative z-20 shrink-0 px-3 pb-4 pt-1 sm:px-6",
+            showTimeline && "sm:mr-96"
+          )}>
           {/* Queued Prompts Display */}
           <AnimatePresence>
             {queuedPrompts.length > 0 && (
@@ -1409,7 +1373,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 20 }}
-                className="absolute bottom-32 left-1/2 z-30 w-full max-w-3xl -translate-x-1/2 px-4"
+                className="mx-auto mb-1 max-h-32 w-full max-w-3xl overflow-y-auto"
               >
                 <div className="bg-background/95 backdrop-blur-md border rounded-lg shadow-lg p-3 space-y-2">
                   <div className="flex items-center justify-between">
@@ -1472,7 +1436,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
               transition={{ delay: 0.5 }}
-              className="absolute bottom-32 right-6 z-30"
+              className="absolute right-6 bottom-full z-30 mb-1"
             >
               <div className="flex items-center bg-background/95 backdrop-blur-md border rounded-full shadow-lg overflow-hidden">
                 <TooltipSimple content={translate("Scroll to top")} side="top">
@@ -1483,29 +1447,8 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => {
-                      // Use virtualizer to scroll to the first item
-                      if (displayableMessages.length > 0) {
-                        // Scroll to top of the container
-                        parentRef.current?.scrollTo({
-                          top: 0,
-                          behavior: 'smooth'
-                        });
-                        
-                        // After smooth scroll completes, trigger a small scroll to ensure rendering
-                        setTimeout(() => {
-                          if (parentRef.current) {
-                            // Scroll down 1px then back to 0 to trigger virtualizer update
-                            parentRef.current.scrollTop = 1;
-                            requestAnimationFrame(() => {
-                              if (parentRef.current) {
-                                parentRef.current.scrollTop = 0;
-                              }
-                            });
-                          }
-                        }, 500); // Wait for smooth scroll to complete
-                      }
-                    }}
+                      aria-label={translate("Scroll to top")}
+                      onClick={() => parentRef.current?.scrollTo({ top: 0 })}
                       className="px-3 py-2 hover:bg-accent rounded-none"
                     >
                       <ChevronUp className="h-4 w-4" />
@@ -1521,24 +1464,8 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => {
-                        // Use the improved scrolling method for manual scroll to bottom
-                        if (displayableMessages.length > 0) {
-                          const scrollElement = parentRef.current;
-                          if (scrollElement) {
-                            // First, scroll using virtualizer to get close to the bottom
-                            rowVirtualizer.scrollToIndex(displayableMessages.length - 1, { align: 'end', behavior: 'auto' });
-
-                            // Then use direct scroll to ensure we reach the absolute bottom
-                            requestAnimationFrame(() => {
-                              scrollElement.scrollTo({
-                                top: scrollElement.scrollHeight,
-                                behavior: 'smooth'
-                              });
-                            });
-                          }
-                        }
-                      }}
+                      aria-label={translate("Scroll to bottom")}
+                      onClick={() => rowVirtualizer.scrollToIndex(displayableMessages.length - 1, { align: 'end' })}
                       className="px-3 py-2 hover:bg-accent rounded-none"
                     >
                       <ChevronDown className="h-4 w-4" />
@@ -1549,10 +1476,6 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
             </motion.div>
           )}
 
-          <div className={cn(
-            "relative z-20 shrink-0 px-3 pb-4 pt-1 sm:px-6",
-            showTimeline && "sm:mr-96"
-          )}>
             <div className="mx-auto max-w-3xl">
               <div className="flex h-8 items-center justify-between gap-2 px-2 text-xs text-muted-foreground">
                 <span className="flex min-w-0 items-center gap-2" title={projectPath}>
