@@ -1011,6 +1011,10 @@ export const api = {
     return apiCall("load_session_history", { sessionId, projectId });
   },
 
+  async forkSessionBeforeMessage(sessionId: string, projectPath: string, messageId: string, newSessionId: string): Promise<boolean> {
+    return apiCall("fork_session_before_message", { sessionId, projectPath, messageId, newSessionId });
+  },
+
   /**
    * Loads the JSONL history for a specific agent session
    * Similar to loadSessionHistory but searches across all project directories

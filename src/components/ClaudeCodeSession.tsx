@@ -25,7 +25,7 @@ import { Popover } from "@/components/ui/popover";
 import { api, type Session } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { listen, type UnlistenFn } from "@/lib/tauriEvents";
-import { isStreamSummary, StreamMessage } from "./StreamMessage";
+import { getUserMessageText, isStreamSummary, StreamMessage } from "./StreamMessage";
 import { FloatingPromptInput, type FloatingPromptInputRef } from "./FloatingPromptInput";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { TimelineNavigator } from "./TimelineNavigator";
@@ -125,6 +125,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
   const [copyPopoverOpen, setCopyPopoverOpen] = useState(false);
   const [totalTokens, setTotalTokens] = useState(0);
   const [extractedSessionInfo, setExtractedSessionInfo] = useState<{ sessionId: string; projectId: string } | null>(null);
+  const [branchOriginSessionId, setBranchOriginSessionId] = useState<string | null>(null);
   const [claudeSessionId, setClaudeSessionId] = useState<string | null>(null);
   const [showTimeline, setShowTimeline] = useState(false);
   const [timelineVersion, setTimelineVersion] = useState(0);
@@ -196,7 +197,12 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
 
   // Get effective session info (from prop or extracted) - use useMemo to ensure it updates
   const effectiveSession = useMemo(() => {
-    if (session) return session;
+    if (session) {
+      if (branchOriginSessionId === session.id && extractedSessionInfo) {
+        return { ...session, id: extractedSessionInfo.sessionId, project_id: extractedSessionInfo.projectId };
+      }
+      return session;
+    }
     if (extractedSessionInfo) {
       return {
         id: extractedSessionInfo.sessionId,
@@ -206,7 +212,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
       } as Session;
     }
     return null;
-  }, [session, extractedSessionInfo, projectPath]);
+  }, [session, extractedSessionInfo, branchOriginSessionId, projectPath]);
 
   const effectiveSessionId = effectiveSession?.id;
   useEffect(() => {
@@ -534,7 +540,12 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
 
   // Project path selection handled by parent tab controls
 
-  const handleSendPrompt = async (prompt: string, selection: ModelSelection, resumeId = effectiveSession?.id) => {
+  const handleSendPrompt = async (
+    prompt: string,
+    selection: ModelSelection,
+    resumeId = effectiveSession?.id,
+    editMessageId?: string
+  ) => {
     const { providerId } = selection;
     // Keep custom model identifiers out of analytics.
     const model = providerId ? "custom" : selection.model;
@@ -564,9 +575,44 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
       setIsLoading(true);
       setError(null);
       hasActiveSessionRef.current = true;
+
+      if (editMessageId) {
+        if (!resumeId || !effectiveSession) {
+          throw new Error(translate("This message cannot be edited in the current session"));
+        }
+        const forkedSessionId = crypto.randomUUID();
+        const hasPreviousHistory = await api.forkSessionBeforeMessage(
+          resumeId,
+          projectPath,
+          editMessageId,
+          forkedSessionId
+        );
+        setBranchOriginSessionId(previous => previous ?? session?.id ?? resumeId ?? null);
+        if (hasPreviousHistory) {
+          const history = await api.loadSessionHistory(forkedSessionId, effectiveSession.project_id);
+          setMessages(history.map(entry => ({ ...entry, type: entry.type || "assistant" })));
+          setRawJsonlOutput(history.map(entry => JSON.stringify(entry)));
+          setExtractedSessionInfo({ sessionId: forkedSessionId, projectId: effectiveSession.project_id });
+          setClaudeSessionId(forkedSessionId);
+          SessionPersistenceService.saveSession(
+            forkedSessionId,
+            effectiveSession.project_id,
+            projectPath,
+            history.length
+          );
+          onSessionIdentified?.(forkedSessionId, prompt);
+          resumeId = forkedSessionId;
+        } else {
+          setMessages([]);
+          setRawJsonlOutput([]);
+          setExtractedSessionInfo(null);
+          setClaudeSessionId(null);
+          resumeId = undefined;
+        }
+      }
       
       // For resuming sessions, ensure we have the session ID
-      if (effectiveSession && !claudeSessionId) {
+      if (effectiveSession && !claudeSessionId && !editMessageId) {
         setClaudeSessionId(effectiveSession.id);
       }
       
@@ -645,7 +691,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
                 setClaudeSessionId(msg.session_id);
 
                 // If we haven't extracted session info before, do it now
-                if (!extractedSessionInfo) {
+                if (!extractedSessionInfo || extractedSessionInfo.sessionId !== msg.session_id) {
                   const projectId = projectPath.replace(/[^a-zA-Z0-9]/g, '-');
                   setExtractedSessionInfo({ sessionId: msg.session_id, projectId });
                   onSessionIdentified?.(msg.session_id, prompt);
@@ -759,7 +805,20 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
               sessionMetrics.current.errorsEncountered += 1;
             }
 
-            setMessages((prev) => [...prev, message]);
+            setMessages((prev) => {
+              if (message.type === "user" && message.uuid) {
+                const incomingText = getUserMessageText(message);
+                const pendingIndex = prev.findIndex(candidate =>
+                  candidate.localPending && getUserMessageText(candidate) === incomingText
+                );
+                if (pendingIndex >= 0) {
+                  const updated = [...prev];
+                  updated[pendingIndex] = message;
+                  return updated;
+                }
+              }
+              return [...prev, message];
+            });
           } catch (err) {
             console.error('Failed to parse message:', err, payload);
           }
@@ -771,6 +830,16 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
           if (completed) return;
           completed = true;
           approvals.close();
+          if (success && currentSessionId) {
+            try {
+              const projectId = effectiveSession?.project_id ?? projectPath.replace(/[^a-zA-Z0-9]/g, '-');
+              const history = await api.loadSessionHistory(currentSessionId, projectId);
+              setMessages(history.map(entry => ({ ...entry, type: entry.type || "assistant" })));
+              setRawJsonlOutput(history.map(entry => JSON.stringify(entry)));
+            } catch (err) {
+              console.warn("Failed to refresh completed session history:", err);
+            }
+          }
           setWorkspaceRevision((revision) => revision + 1);
           if (!success) addNotice(translate("Claude Code exited unsuccessfully"), "Error");
           setIsLoading(false);
@@ -779,7 +848,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
           window.dispatchEvent(new CustomEvent('project-session-finished', { detail: projectPath }));
           
           // Track enhanced session stopped metrics when session completes
-          if (effectiveSession && claudeSessionId) {
+          if (effectiveSession && currentSessionId) {
             const sessionStartTimeValue = messages.length > 0 ? messages[0].timestamp || Date.now() : Date.now();
             const duration = Date.now() - sessionStartTimeValue;
             const metrics = sessionMetrics.current;
@@ -836,17 +905,17 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
             });
           }
 
-          if (effectiveSession && success) {
+          if (effectiveSession && currentSessionId && success) {
             try {
               const settings = await api.getCheckpointSettings(
-                effectiveSession.id,
+                currentSessionId,
                 effectiveSession.project_id,
                 projectPath
               );
 
               if (settings.auto_checkpoint_enabled) {
                 await api.checkAutoCheckpoint(
-                  effectiveSession.id,
+                  currentSessionId,
                   effectiveSession.project_id,
                   projectPath,
                   prompt
@@ -893,6 +962,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
         // Add the user message immediately to the UI (after setting up listeners)
         const userMessage: ClaudeStreamMessage = {
           type: "user",
+          localPending: true,
           message: {
             content: [
               {
@@ -1336,6 +1406,14 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
               message={displayableMessages[virtualItem.index]}
               streamMessages={messages}
               onLinkDetected={handleLinkDetected}
+              onEditResend={!isLoading && effectiveSession
+                ? (text, messageId) => void handleSendPrompt(
+                    text,
+                    modelSelection ?? initialModel(providers),
+                    effectiveSession.id,
+                    messageId
+                  )
+                : undefined}
               variant="conversation"
             />
           </div>

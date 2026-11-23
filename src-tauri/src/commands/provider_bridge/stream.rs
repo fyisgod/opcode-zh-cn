@@ -275,7 +275,7 @@ impl Reply {
         } else if self.text_open {
             frames.push_str(&frame(
                 "content_block_stop",
-                json!({`n                    "type":"content_block_stop",`n                    "index":if self.thinking_open { 1 } else { 0 }`n                }),
+                json!({"type":"content_block_stop","index":if self.thinking_open { 1 } else { 0 }}),
             ));
             index = if self.thinking_open { 2 } else { 1 };
         }

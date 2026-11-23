@@ -135,6 +135,10 @@ async function restApiCall<T>(endpoint: string, params?: any): Promise<T> {
 export async function apiCall<T>(command: string, params?: any): Promise<T> {
   const isWeb = !detectEnvironment();
   const isStreaming = ['execute_claude_code', 'continue_claude_code', 'resume_claude_code'].includes(command);
+  if (command === 'fork_session_before_message') {
+    if (isWeb) throw new Error('Editing and resending a message requires the desktop app.');
+    return invoke<T>(command, params);
+  }
 
   // A desktop session must not fall back to a web server with different provider settings.
   if (!isWeb && isStreaming) return invoke<T>(command, params);

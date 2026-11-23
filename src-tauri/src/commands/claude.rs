@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::Arc;
@@ -292,6 +292,59 @@ pub(crate) fn session_jsonl_path(
     projects_dir
         .join(encode_project_path(project_path))
         .join(format!("{}.jsonl", session_id))
+}
+
+fn fork_transcript_before_message(
+    source_path: &std::path::Path,
+    fork_path: &std::path::Path,
+    message_id: &str,
+    new_session_id: &str,
+) -> Result<bool, String> {
+    let transcript = fs::read_to_string(source_path)
+        .map_err(|e| format!("Failed to read source session: {e}"))?;
+    let mut prefix = Vec::new();
+    let mut found_message = false;
+
+    for line in transcript.lines() {
+        let mut entry: serde_json::Value = serde_json::from_str(line)
+            .map_err(|e| format!("Cannot fork a session with invalid history: {e}"))?;
+        if entry["uuid"].as_str() == Some(message_id) {
+            if entry["type"].as_str() != Some("user") {
+                return Err("The selected message is not a user message".into());
+            }
+            found_message = true;
+            break;
+        }
+        if entry["sessionId"].is_string() {
+            entry["sessionId"] = serde_json::Value::String(new_session_id.to_owned());
+        }
+        prefix.push(
+            serde_json::to_string(&entry)
+                .map_err(|e| format!("Failed to encode session history: {e}"))?,
+        );
+    }
+
+    if !found_message {
+        return Err("The selected message was not found in this session".into());
+    }
+    if prefix.is_empty() {
+        return Ok(false);
+    }
+    if fork_path.exists() {
+        return Err("The new session already exists".into());
+    }
+
+    let mut fork = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(fork_path)
+        .map_err(|e| format!("Failed to create forked session: {e}"))?;
+    if let Err(error) = fork.write_all(format!("{}\n", prefix.join("\n")).as_bytes()) {
+        drop(fork);
+        let _ = fs::remove_file(fork_path);
+        return Err(format!("Failed to write forked session: {error}"));
+    }
+    Ok(true)
 }
 
 /// Decodes a project directory name back to its original path
@@ -1194,6 +1247,30 @@ pub async fn load_session_history(
     }
 
     Ok(messages)
+}
+
+/// Creates a new session containing only the history before a user message.
+#[tauri::command]
+pub async fn fork_session_before_message(
+    session_id: String,
+    project_path: String,
+    message_id: String,
+    new_session_id: String,
+) -> Result<bool, String> {
+    Uuid::parse_str(&session_id).map_err(|_| "Invalid source session ID".to_string())?;
+    Uuid::parse_str(&message_id).map_err(|_| "Invalid user message ID".to_string())?;
+    Uuid::parse_str(&new_session_id).map_err(|_| "Invalid new session ID".to_string())?;
+
+    let projects_dir = get_claude_dir()
+        .map_err(|e| e.to_string())?
+        .join("projects");
+    let source = session_jsonl_path(&projects_dir, &project_path, &session_id);
+    let fork = session_jsonl_path(&projects_dir, &project_path, &new_session_id);
+    tokio::task::spawn_blocking(move || {
+        fork_transcript_before_message(&source, &fork, &message_id, &new_session_id)
+    })
+    .await
+    .map_err(|e| format!("Failed to fork session history: {e}"))?
 }
 
 /// Execute a new interactive Claude Code session with streaming output
@@ -2554,7 +2631,6 @@ pub async fn validate_hook_command(command: String) -> Result<serde_json::Value,
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Write;
     use tempfile::TempDir;
 
     /// Helper function to create a test session file
@@ -2567,6 +2643,82 @@ mod tests {
         let mut file = fs::File::create(file_path)?;
         file.write_all(content.as_bytes())?;
         Ok(())
+    }
+
+    #[test]
+    fn fork_transcript_copies_only_messages_before_the_selected_user_turn() {
+        let temp_dir = TempDir::new().unwrap();
+        let source = temp_dir.path().join("source.jsonl");
+        let fork = temp_dir.path().join("fork.jsonl");
+        let source_id = Uuid::new_v4().to_string();
+        let target_id = Uuid::new_v4().to_string();
+        let new_id = Uuid::new_v4().to_string();
+        let content = [
+            serde_json::json!({
+                "type":"user", "uuid":Uuid::new_v4(), "sessionId":source_id,
+                "message":{"role":"user", "content":"keep"}
+            }),
+            serde_json::json!({
+                "type":"assistant", "uuid":Uuid::new_v4(), "sessionId":source_id,
+                "message":{"role":"assistant", "content":[]}
+            }),
+            serde_json::json!({
+                "type":"user", "uuid":target_id, "sessionId":source_id,
+                "message":{"role":"user", "content":"replace"}
+            }),
+            serde_json::json!({
+                "type":"assistant", "uuid":Uuid::new_v4(), "sessionId":source_id
+            }),
+        ]
+        .into_iter()
+        .map(|entry| entry.to_string())
+        .collect::<Vec<_>>()
+        .join("\n")
+            + "\n";
+        fs::write(&source, &content).unwrap();
+
+        assert!(fork_transcript_before_message(&source, &fork, &target_id, &new_id).unwrap());
+
+        let forked = fs::read_to_string(&fork).unwrap();
+        let entries = forked.lines().collect::<Vec<_>>();
+        assert_eq!(entries.len(), 2);
+        assert!(entries.iter().all(|line| line.contains(&new_id)));
+        assert!(!forked.contains(&target_id));
+        assert!(!forked.contains("replace"));
+        assert_eq!(fs::read_to_string(&source).unwrap(), content);
+    }
+
+    #[test]
+    fn fork_transcript_rejects_missing_or_non_user_targets() {
+        let temp_dir = TempDir::new().unwrap();
+        let source = temp_dir.path().join("source.jsonl");
+        let fork = temp_dir.path().join("fork.jsonl");
+        let assistant_id = Uuid::new_v4().to_string();
+        fs::write(
+            &source,
+            format!("{{\"type\":\"assistant\",\"uuid\":\"{assistant_id}\"}}\n"),
+        )
+        .unwrap();
+
+        assert!(fork_transcript_before_message(&source, &fork, &assistant_id, "new").is_err());
+        assert!(fork_transcript_before_message(&source, &fork, "missing", "new").is_err());
+        assert!(!fork.exists());
+    }
+
+    #[test]
+    fn fork_transcript_reports_when_the_selected_turn_starts_a_new_session() {
+        let temp_dir = TempDir::new().unwrap();
+        let source = temp_dir.path().join("source.jsonl");
+        let fork = temp_dir.path().join("fork.jsonl");
+        let target_id = Uuid::new_v4().to_string();
+        fs::write(
+            &source,
+            format!("{{\"type\":\"user\",\"uuid\":\"{target_id}\"}}\n"),
+        )
+        .unwrap();
+
+        assert!(!fork_transcript_before_message(&source, &fork, &target_id, "new").unwrap());
+        assert!(!fork.exists());
     }
 
     #[test]

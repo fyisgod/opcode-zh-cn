@@ -5,9 +5,16 @@ import {
   User, 
   Bot, 
   AlertCircle, 
-  CheckCircle2
+  CheckCircle2,
+  Check,
+  Copy,
+  Pencil,
+  Send,
+  X
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -47,8 +54,82 @@ interface StreamMessageProps {
   className?: string;
   streamMessages: ClaudeStreamMessage[];
   onLinkDetected?: (url: string) => void;
+  onEditResend?: (text: string, messageId: string) => void;
   variant?: "conversation";
 }
+
+export function getUserMessageText(message: ClaudeStreamMessage): string {
+  const content = (message.message || message).content;
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content
+    .filter((part: any) => part.type === "text" && typeof part.text === "string")
+    .map((part: any) => part.text)
+    .join("\n");
+}
+
+const UserMessageActions: React.FC<{
+  text: string;
+  messageId?: string;
+  onEditResend?: (text: string, messageId: string) => void;
+}> = ({ text, messageId, onEditResend }) => {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(text);
+  const [copyStatus, setCopyStatus] = useState<"copied" | "failed" | null>(null);
+
+  const copyMessage = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopyStatus("copied");
+      window.setTimeout(() => setCopyStatus(null), 1400);
+    } catch (error) {
+      setCopyStatus("failed");
+      console.error("Failed to copy user message:", error);
+    }
+  };
+
+  if (editing) {
+    return (
+      <div className="mt-2 space-y-2">
+        <Textarea
+          autoFocus
+          aria-label={translate("Edit message")}
+          value={draft}
+          onChange={event => setDraft(event.target.value)}
+          onKeyDown={event => {
+            if (event.key === "Escape") setEditing(false);
+            if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && draft.trim()) {
+              event.preventDefault();
+              if (messageId) onEditResend?.(draft.trim(), messageId);
+            }
+          }}
+          className="min-h-20 resize-y bg-background text-foreground"
+        />
+        <div className="flex justify-end gap-1">
+          <Button type="button" size="icon" variant="ghost" title={translate("Cancel editing")} aria-label={translate("Cancel editing")} onClick={() => setEditing(false)}>
+            <X className="size-4" />
+          </Button>
+          <Button type="button" size="icon" title={translate("Edit and resend")} aria-label={translate("Edit and resend")} disabled={!draft.trim() || !onEditResend} onClick={() => messageId && onEditResend?.(draft.trim(), messageId)}>
+            <Send className="size-4" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-1 flex justify-end gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+      <Button type="button" size="icon" variant="ghost" className="size-7" title={translate(copyStatus === "copied" ? "Copied!" : copyStatus === "failed" ? "Copy failed" : "Copy message")} aria-label={translate(copyStatus === "copied" ? "Copied!" : copyStatus === "failed" ? "Copy failed" : "Copy message")} onClick={() => void copyMessage()}>
+        {copyStatus === "copied" ? <Check className="size-3.5" /> : copyStatus === "failed" ? <AlertCircle className="size-3.5 text-destructive" /> : <Copy className="size-3.5" />}
+      </Button>
+      {messageId && onEditResend && (
+        <Button type="button" size="icon" variant="ghost" className="size-7" title={translate("Edit message")} aria-label={translate("Edit message")} onClick={() => { setDraft(text); setEditing(true); }}>
+          <Pencil className="size-3.5" />
+        </Button>
+      )}
+    </div>
+  );
+};
 
 export function isStreamSummary(message: ClaudeStreamMessage): boolean {
   const type: string = message.type;
@@ -58,7 +139,7 @@ export function isStreamSummary(message: ClaudeStreamMessage): boolean {
 /**
  * Component to render a single Claude Code stream message
  */
-const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, className, streamMessages, onLinkDetected, variant }) => {
+const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, className, streamMessages, onLinkDetected, onEditResend, variant }) => {
   useLanguage();
   // State to track tool results mapped by tool call ID
   const [toolResults, setToolResults] = useState<Map<string, any>>(new Map());
@@ -353,7 +434,7 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, classNa
       
       const renderedCard = (
         <MessageFrame className={cn(bubble
-          ? "ml-auto w-fit max-w-[88%] rounded-lg bg-muted text-foreground"
+          ? "group ml-auto w-fit max-w-[88%] rounded-lg bg-muted text-foreground"
           : "border-muted-foreground/20 bg-muted/20", className)}>
           <CardContent className={bubble ? "px-4 py-2.5" : "p-4"}>
             <div className="flex items-start gap-3">
@@ -656,6 +737,13 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, classNa
                 })}
               </div>
             </div>
+            {bubble && renderedSomething && (
+              <UserMessageActions
+                text={getUserMessageText(message)}
+                messageId={message.uuid}
+                onEditResend={onEditResend}
+              />
+            )}
           </CardContent>
         </MessageFrame>
       );
