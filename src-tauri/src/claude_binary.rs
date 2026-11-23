@@ -9,6 +9,38 @@ use std::path::PathBuf;
 use std::process::Command;
 use tauri::Manager;
 
+pub(crate) async fn cli_at_least(path: &str, minimum: [u32; 3]) -> bool {
+    let mut command = tokio::process::Command::from(background_command(path));
+    let output = tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        command.arg("--version").kill_on_drop(true).output(),
+    )
+    .await;
+    if let Ok(Ok(output)) = output {
+        let version = String::from_utf8_lossy(&output.stdout);
+        if output.status.success()
+            && version
+                .split_whitespace()
+                .next()
+                .and_then(parse_version)
+                .is_some_and(|v| v >= minimum)
+        {
+            return true;
+        }
+    }
+    false
+}
+
+fn parse_version(version: &str) -> Option<[u32; 3]> {
+    let mut parts = version.split('.');
+    let numbers = [
+        parts.next()?.parse().ok()?,
+        parts.next()?.parse().ok()?,
+        parts.next()?.parse().ok()?,
+    ];
+    parts.next().is_none().then_some(numbers)
+}
+
 /// Type of Claude installation
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum InstallationType {

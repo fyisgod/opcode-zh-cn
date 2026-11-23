@@ -10,6 +10,9 @@ use tauri::{AppHandle, Emitter, Manager};
 use tokio::process::{Child, Command};
 use tokio::sync::Mutex;
 
+use super::conversation_approvals::ApprovalTurn;
+use super::conversation_permissions::{configure_prompt, configure_prompt_with_approvals, ConversationPermission};
+use uuid::Uuid;
 use crate::process::background_command;
 
 /// Global state to track current Claude process
@@ -1201,6 +1204,8 @@ pub async fn execute_claude_code(
     prompt: String,
     model: String,
     provider_id: Option<String>,
+    permission_mode: Option<ConversationPermission>,
+    approval_turn_id: Option<Uuid>,
 ) -> Result<(), String> {
     log::info!(
         "Starting new Claude Code session in: {} with model: {}",
@@ -1208,7 +1213,17 @@ pub async fn execute_claude_code(
         model
     );
 
-    run_claude_prompt(app, project_path, prompt, model, provider_id, &[]).await
+    run_claude_prompt(
+        app,
+        project_path,
+        prompt,
+        model,
+        provider_id,
+        permission_mode.unwrap_or_default(),
+        approval_turn_id,
+        &[],
+    )
+    .await
 }
 
 /// Continue an existing Claude Code conversation with streaming output
@@ -1219,6 +1234,8 @@ pub async fn continue_claude_code(
     prompt: String,
     model: String,
     provider_id: Option<String>,
+    permission_mode: Option<ConversationPermission>,
+    approval_turn_id: Option<Uuid>,
 ) -> Result<(), String> {
     log::info!(
         "Continuing Claude Code conversation in: {} with model: {}",
@@ -1226,7 +1243,17 @@ pub async fn continue_claude_code(
         model
     );
 
-    run_claude_prompt(app, project_path, prompt, model, provider_id, &["-c"]).await
+    run_claude_prompt(
+        app,
+        project_path,
+        prompt,
+        model,
+        provider_id,
+        permission_mode.unwrap_or_default(),
+        approval_turn_id,
+        &["-c"],
+    )
+    .await
 }
 
 /// Resume an existing Claude Code session by ID with streaming output
@@ -1238,6 +1265,8 @@ pub async fn resume_claude_code(
     prompt: String,
     model: String,
     provider_id: Option<String>,
+    permission_mode: Option<ConversationPermission>,
+    approval_turn_id: Option<Uuid>,
 ) -> Result<(), String> {
     log::info!(
         "Resuming Claude Code session: {} in: {} with model: {}",
@@ -1246,7 +1275,17 @@ pub async fn resume_claude_code(
         model
     );
 
-    run_claude_prompt(app, project_path, prompt, model, provider_id, &["--resume", &session_id]).await
+    run_claude_prompt(
+        app,
+        project_path,
+        prompt,
+        model,
+        provider_id,
+        permission_mode.unwrap_or_default(),
+        approval_turn_id,
+        &[&format!("--resume={session_id}")],
+    )
+    .await
 }
 
 async fn run_claude_prompt(
@@ -1255,32 +1294,34 @@ async fn run_claude_prompt(
     prompt: String,
     model: String,
     provider_id: Option<String>,
+    permission_mode: ConversationPermission,
+    approval_turn_id: Option<Uuid>,
     session_args: &[&str],
 ) -> Result<(), String> {
     let claude_path = find_claude_binary(&app)?;
+    permission_mode.check_cli_support(&claude_path).await?;
     let mut cmd = create_command_with_env(&claude_path);
     let provider_bridge = if let Some(id) = provider_id {
         let provider = super::model_provider::ActiveProvider::load(&app, &id, &model)?;
-        super::model_provider::check_cli_support(&claude_path).await?;
+        if permission_mode == ConversationPermission::FullAccess {
+            super::model_provider::check_cli_support(&claude_path).await?;
+        }
         provider.configure(&mut cmd).await?
     } else {
         None
     };
-    cmd.args(session_args)
-        .args([
-            "-p",
-            &prompt,
-            "--model",
-            &model,
-            "--output-format",
-            "stream-json",
-            "--verbose",
-            "--dangerously-skip-permissions",
-        ])
-        .current_dir(&project_path)
+    cmd.args(session_args);
+    // Callers without an approval listener continue to use the hard workspace boundary.
+    let approval_turn_id = approval_turn_id.filter(|_| permission_mode == ConversationPermission::WorkspaceWrite);
+    if approval_turn_id.is_some() {
+        configure_prompt_with_approvals(&mut cmd, &model);
+    } else {
+        configure_prompt(&mut cmd, &prompt, &model, permission_mode);
+    }
+    cmd.current_dir(&project_path)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    spawn_claude_process(app, cmd, prompt, model, project_path, provider_bridge).await
+    spawn_claude_process(app, cmd, prompt, model, project_path, provider_bridge, approval_turn_id).await
 }
 
 /// Cancel the currently running Claude Code execution
@@ -1464,6 +1505,7 @@ async fn spawn_claude_process(
     model: String,
     project_path: String,
     provider_bridge: Option<super::provider_bridge::ProviderBridge>,
+    approval_turn_id: Option<Uuid>,
 ) -> Result<(), String> {
     use std::sync::Mutex;
     use tokio::io::{AsyncBufReadExt, BufReader};
@@ -1478,6 +1520,14 @@ async fn spawn_claude_process(
     // Get stdout and stderr
     let stdout = child.stdout.take().ok_or("Failed to get stdout")?;
     let stderr = child.stderr.take().ok_or("Failed to get stderr")?;
+
+    let mut approval_turn = if let Some(turn_id) = approval_turn_id {
+        let stdin = child.stdin.take().ok_or("Failed to get Claude input stream")?;
+        Some(ApprovalTurn::start(app.clone(), turn_id, stdin, &prompt).await
+            .map_err(|err| format!("Failed to send prompt to Claude Code: {err}"))?)
+    } else {
+        None
+    };
 
     // Get the child PID for logging
     let pid = child.id().unwrap_or(0);
@@ -1514,11 +1564,34 @@ async fn spawn_claude_process(
     let model_clone = model.clone();
     let stdout_task = tokio::spawn(async move {
         let mut lines = stdout_reader.lines();
-        while let Ok(Some(line)) = lines.next_line().await {
+        loop {
+            let next = match &mut approval_turn {
+                Some(turn) => turn.next_line(&mut lines).await,
+                None => lines.next_line().await,
+            };
+            let line = match next {
+                Ok(Some(line)) => line,
+                Ok(None) => break,
+                Err(err) => {
+                    log::warn!("Claude output stream closed: {err}");
+                    break;
+                }
+            };
+            let parsed = serde_json::from_str::<serde_json::Value>(&line);
+            if let (Some(turn), Ok(message)) = (&mut approval_turn, &parsed) {
+                match turn.handle_message(message).await {
+                    Ok(true) => continue,
+                    Ok(false) => {},
+                    Err(err) => {
+                        log::warn!("Claude approval stream closed: {err}");
+                        break;
+                    }
+                }
+            }
             log::debug!("Claude stdout: {}", line);
 
             // Parse the line to check for init message with session ID
-            if let Ok(msg) = serde_json::from_str::<serde_json::Value>(&line) {
+            if let Ok(msg) = parsed {
                 if msg["type"] == "system" && msg["subtype"] == "init" {
                     if let Some(claude_session_id) = msg["session_id"].as_str() {
                         let mut session_id_guard = session_id_holder_clone.lock().unwrap();

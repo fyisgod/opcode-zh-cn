@@ -317,6 +317,7 @@ async function handleStreamingCommand<T>(command: string, params?: any): Promise
         prompt: params?.prompt || '',
         model: params?.model || 'claude-3-5-sonnet-20241022',
         session_id: params?.sessionId,
+        permission_mode: params?.permissionMode,
       };
       
       console.log(`[TRACE] Sending WebSocket request:`, request);

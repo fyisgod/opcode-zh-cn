@@ -18,7 +18,13 @@ use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::ServeDir;
 use which;
 
-use crate::{commands, process::background_command};
+use crate::{
+    commands::{
+        self,
+        conversation_permissions::{configure_prompt, ConversationPermission},
+    },
+    process::background_command,
+};
 
 // Find Claude binary for web mode - use bundled binary first
 fn find_claude_binary_web() -> Result<String, String> {
@@ -72,6 +78,8 @@ pub struct ClaudeExecutionRequest {
     pub prompt: String,
     pub model: Option<String>,
     pub session_id: Option<String>,
+    #[serde(default)]
+    pub permission_mode: ConversationPermission,
     pub command_type: String, // "execute", "continue", or "resume"
 }
 
@@ -331,6 +339,7 @@ async fn claude_websocket_handler(socket: WebSocket, state: AppState) {
                                         request.project_path,
                                         request.prompt,
                                         request.model.unwrap_or_default(),
+                                        request.permission_mode,
                                         session_id_clone.clone(),
                                         state_clone.clone(),
                                     )
@@ -342,6 +351,7 @@ async fn claude_websocket_handler(socket: WebSocket, state: AppState) {
                                         request.project_path,
                                         request.prompt,
                                         request.model.unwrap_or_default(),
+                                        request.permission_mode,
                                         session_id_clone.clone(),
                                         state_clone.clone(),
                                     )
@@ -354,6 +364,7 @@ async fn claude_websocket_handler(socket: WebSocket, state: AppState) {
                                         request.session_id.unwrap_or_default(),
                                         request.prompt,
                                         request.model.unwrap_or_default(),
+                                        request.permission_mode,
                                         session_id_clone.clone(),
                                         state_clone.clone(),
                                     )
@@ -446,6 +457,7 @@ async fn execute_claude_command(
     project_path: String,
     prompt: String,
     model: String,
+    permission_mode: ConversationPermission,
     session_id: String,
     state: AppState,
 ) -> Result<(), String> {
@@ -482,26 +494,12 @@ async fn execute_claude_command(
 
     // Create Claude command
     println!("[TRACE] Creating Claude command...");
+    permission_mode.check_cli_support(&claude_path).await?;
     let mut cmd = Command::from(background_command(&claude_path));
-    let args = [
-        "-p",
-        &prompt,
-        "--model",
-        &model,
-        "--output-format",
-        "stream-json",
-        "--verbose",
-        "--dangerously-skip-permissions",
-    ];
-    cmd.args(args);
+    configure_prompt(&mut cmd, &prompt, &model, permission_mode);
     cmd.current_dir(&project_path);
     cmd.stdout(std::process::Stdio::piped());
     cmd.stderr(std::process::Stdio::piped());
-
-    println!(
-        "[TRACE] Command: {} {:?} (in dir: {})",
-        claude_path, args, project_path
-    );
 
     // Spawn Claude process
     println!("[TRACE] Spawning Claude process...");
@@ -572,6 +570,7 @@ async fn continue_claude_command(
     project_path: String,
     prompt: String,
     model: String,
+    permission_mode: ConversationPermission,
     session_id: String,
     state: AppState,
 ) -> Result<(), String> {
@@ -594,18 +593,10 @@ async fn continue_claude_command(
         find_claude_binary_web().map_err(|e| format!("Claude binary not found: {}", e))?;
 
     // Create continue command
+    permission_mode.check_cli_support(&claude_path).await?;
     let mut cmd = Command::from(background_command(&claude_path));
-    cmd.args([
-        "-c", // Continue flag
-        "-p",
-        &prompt,
-        "--model",
-        &model,
-        "--output-format",
-        "stream-json",
-        "--verbose",
-        "--dangerously-skip-permissions",
-    ]);
+    cmd.arg("-c");
+    configure_prompt(&mut cmd, &prompt, &model, permission_mode);
     cmd.current_dir(&project_path);
     cmd.stdout(std::process::Stdio::piped());
     cmd.stderr(std::process::Stdio::piped());
@@ -650,6 +641,7 @@ async fn resume_claude_command(
     claude_session_id: String,
     prompt: String,
     model: String,
+    permission_mode: ConversationPermission,
     session_id: String,
     state: AppState,
 ) -> Result<(), String> {
@@ -681,28 +673,13 @@ async fn resume_claude_command(
 
     // Create resume command
     println!("[resume_claude_command] Creating command...");
+    permission_mode.check_cli_support(&claude_path).await?;
     let mut cmd = Command::from(background_command(&claude_path));
-    let args = [
-        "--resume",
-        &claude_session_id,
-        "-p",
-        &prompt,
-        "--model",
-        &model,
-        "--output-format",
-        "stream-json",
-        "--verbose",
-        "--dangerously-skip-permissions",
-    ];
-    cmd.args(args);
+    cmd.arg(format!("--resume={claude_session_id}"));
+    configure_prompt(&mut cmd, &prompt, &model, permission_mode);
     cmd.current_dir(&project_path);
     cmd.stdout(std::process::Stdio::piped());
     cmd.stderr(std::process::Stdio::piped());
-
-    println!(
-        "[resume_claude_command] Command: {} {:?} (in dir: {})",
-        claude_path, args, project_path
-    );
 
     // Spawn and stream output
     println!("[resume_claude_command] Spawning process...");

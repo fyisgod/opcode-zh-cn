@@ -30,6 +30,7 @@ use commands::claude::{
     track_checkpoint_message, track_session_messages, update_checkpoint_settings,
     update_hooks_config, validate_hook_command, ClaudeProcessState,
 };
+use commands::conversation_approvals::{close_claude_approval_turn, decide_claude_approval, ClaudeApprovals};
 use commands::mcp::{
     mcp_add, mcp_add_from_claude_desktop, mcp_add_json, mcp_get, mcp_get_server_status, mcp_list,
     mcp_read_project_config, mcp_remove, mcp_reset_project_choices, mcp_save_project_config,
@@ -149,6 +150,7 @@ fn main() {
 
             // Initialize Claude process state
             app.manage(ClaudeProcessState::default());
+            app.manage(ClaudeApprovals::default());
 
             // Apply window vibrancy with rounded corners on macOS
             #[cfg(target_os = "macos")]
@@ -204,6 +206,8 @@ fn main() {
             load_session_history,
             execute_claude_code,
             continue_claude_code,
+            decide_claude_approval,
+            close_claude_approval_turn,
             resume_claude_code,
             cancel_claude_execution,
             list_running_claude_sessions,

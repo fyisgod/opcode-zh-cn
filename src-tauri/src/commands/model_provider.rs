@@ -10,36 +10,11 @@ use tokio::process::Command;
 
 pub(crate) async fn check_cli_support(path: &str) -> Result<(), String> {
     // Use a baseline verified to honor host-controlled routing and credential scrubbing.
-    const MIN_VERSION: [u32; 3] = [2, 1, 329];
-    let mut command = Command::from(crate::process::background_command(path));
-    let output = tokio::time::timeout(
-        std::time::Duration::from_secs(5),
-        command.arg("--version").kill_on_drop(true).output(),
-    )
-    .await;
-    if let Ok(Ok(output)) = output {
-        let version = String::from_utf8_lossy(&output.stdout);
-        if output.status.success()
-            && version
-                .split_whitespace()
-                .next()
-                .and_then(parse_version)
-                .is_some_and(|v| v >= MIN_VERSION)
-        {
-            return Ok(());
-        }
+    if crate::claude_binary::cli_at_least(path, [2, 1, 329]).await {
+        Ok(())
+    } else {
+        Err("Custom providers require Claude Code 2.1.329 or later.".into())
     }
-    Err("Custom providers require Claude Code 2.1.329 or later.".into())
-}
-
-fn parse_version(version: &str) -> Option<[u32; 3]> {
-    let mut parts = version.split('.');
-    let numbers = [
-        parts.next()?.parse().ok()?,
-        parts.next()?.parse().ok()?,
-        parts.next()?.parse().ok()?,
-    ];
-    parts.next().is_none().then_some(numbers)
 }
 
 #[derive(Clone, Copy, Default, Deserialize, PartialEq, Serialize)]

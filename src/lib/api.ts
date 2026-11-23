@@ -1,4 +1,5 @@
 import { apiCall } from './apiAdapter';
+import type { ConversationPermission } from './conversationPermissions';
 import type { HooksConfiguration } from '@/types/hooks';
 
 /** Process type for tracking in ProcessRegistry */
@@ -1028,22 +1029,30 @@ export const api = {
   /**
    * Executes a new interactive Claude Code session with streaming output
    */
-  async executeClaudeCode(projectPath: string, prompt: string, model: string, providerId?: string): Promise<void> {
-    return apiCall("execute_claude_code", { projectPath, prompt, model, providerId });
+  async executeClaudeCode(projectPath: string, prompt: string, model: string, providerId?: string, permissionMode?: ConversationPermission, approvalTurnId?: string): Promise<void> {
+    return apiCall("execute_claude_code", { projectPath, prompt, model, providerId, permissionMode, approvalTurnId });
   },
 
   /**
    * Continues an existing Claude Code conversation with streaming output
    */
-  async continueClaudeCode(projectPath: string, prompt: string, model: string, providerId?: string): Promise<void> {
-    return apiCall("continue_claude_code", { projectPath, prompt, model, providerId });
+  async continueClaudeCode(projectPath: string, prompt: string, model: string, providerId?: string, permissionMode?: ConversationPermission, approvalTurnId?: string): Promise<void> {
+    return apiCall("continue_claude_code", { projectPath, prompt, model, providerId, permissionMode, approvalTurnId });
   },
 
   /**
    * Resumes an existing Claude Code session by ID with streaming output
    */
-  async resumeClaudeCode(projectPath: string, sessionId: string, prompt: string, model: string, providerId?: string): Promise<void> {
-    return apiCall("resume_claude_code", { projectPath, sessionId, prompt, model, providerId });
+  async resumeClaudeCode(projectPath: string, sessionId: string, prompt: string, model: string, providerId?: string, permissionMode?: ConversationPermission, approvalTurnId?: string): Promise<void> {
+    return apiCall("resume_claude_code", { projectPath, sessionId, prompt, model, providerId, permissionMode, approvalTurnId });
+  },
+
+  async decideClaudeApproval(requestId: string, allow: boolean): Promise<void> {
+    return apiCall("decide_claude_approval", { requestId, allow });
+  },
+
+  async closeClaudeApprovalTurn(turnId: string): Promise<void> {
+    return apiCall("close_claude_approval_turn", { turnId });
   },
 
   /**

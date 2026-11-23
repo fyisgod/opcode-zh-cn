@@ -49,6 +49,7 @@ interface FloatingPromptInputProps {
   defaultModel?: "sonnet" | "opus";
   modelSelection?: ModelSelection;
   onModelChange?: (selection: ModelSelection) => void;
+  permissionControl?: React.ReactNode;
   providers?: ModelProvider[];
   modelsLoaded?: boolean;
   modelsError?: boolean;
@@ -197,6 +198,7 @@ const FloatingPromptInputInner = (
     defaultModel = "sonnet",
     modelSelection,
     onModelChange,
+    permissionControl,
     providers = NO_PROVIDERS,
     modelsLoaded = true,
     modelsError = false,
@@ -949,8 +951,9 @@ const FloatingPromptInputInner = (
                 onDrop={handleDrop}
               />
 
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  {permissionControl}
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground">{translate("Model:")}</span>
                     {renderModelPicker(true)}
@@ -1090,7 +1093,9 @@ const FloatingPromptInputInner = (
           />
 
           <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 pt-1">
-            {extraMenuItems && <div className="flex items-center gap-0.5">{extraMenuItems}</div>}
+            {(extraMenuItems || permissionControl) && (
+              <div className="flex items-center gap-0.5">{extraMenuItems}{permissionControl}</div>
+            )}
             <div className="ml-auto flex min-w-0 max-w-full items-center gap-0.5">
                 {renderModelPicker(false)}
 

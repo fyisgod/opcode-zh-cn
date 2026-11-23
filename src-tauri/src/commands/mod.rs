@@ -1,5 +1,7 @@
 pub mod agents;
 pub mod claude;
+pub mod conversation_approvals;
+pub mod conversation_permissions;
 pub mod mcp;
 pub mod model_provider;
 mod provider_bridge;

@@ -52,6 +52,7 @@ Think of opcode as your command center for Claude Code - bridging the gap betwee
   - [📝 CLAUDE.md Management](#-claudemd-management)
 - [📖 Usage](#-usage)
   - [Getting Started](#getting-started)
+  - [Conversation Permissions](#conversation-permissions)
   - [Custom Model Provider](#custom-model-provider)
   - [Managing Projects](#managing-projects)
   - [Creating Agents](#creating-agents)
@@ -113,6 +114,16 @@ Think of opcode as your command center for Claude Code - bridging the gap betwee
 1. **Launch opcode**: Open the application after installation
 2. **Welcome Screen**: Choose between CC Agents or Projects
 3. **First Time Setup**: opcode will automatically detect your `~/.claude` directory
+
+### Conversation Permissions
+
+Use the shield menu in the chat composer to choose the permissions for the next turn. New chats default to **Workspace write**. A conversation remembers its selection on this device. You can switch modes between turns, including when resuming an existing session.
+
+- **Read-only**: Claude can read and search workspace files, but cannot change them or run commands.
+- **Workspace write**: Claude can also edit workspace files. In the desktop app, reads and edits outside the workspace first require your approval. A grant applies to one operation only. Commands are still disabled. In web mode, access outside the workspace remains blocked.
+- **Full access**: Claude runs with its normal tool set and bypasses interactive permission prompts. Only choose this for a trusted conversation.
+
+The first two modes require Claude Code 2.1.329 or later. Opcode refuses to start the turn on older versions rather than falling back to full access. These modes limit Claude Code to file tools and disable local hooks, plugins, and MCP for the turn; they are not an OS sandbox and do not override administrator-managed policies. Separate CC Agent runs and terminal sessions are not governed by the chat menu.
 
 ### Custom Model Provider
 

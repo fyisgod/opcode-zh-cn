@@ -1,4 +1,8 @@
 import { t as translate, useLanguage } from "@/lib/i18n";
+import { loadConversationPermission, saveConversationPermission, type ConversationPermission } from "@/lib/conversationPermissions";
+import { ConversationPermissionPicker } from "./ConversationPermissionPicker";
+import { WorkspaceApprovalDialog } from "./WorkspaceApprovalDialog";
+import { useWorkspaceApprovals } from "@/hooks/useWorkspaceApprovals";
 import { initialModel, savedProviderFor, useModelProviders, type ModelSelection } from "@/lib/modelProvider";
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -91,6 +95,9 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
   useLanguage();
   const { providers, loaded: modelsLoaded, error: modelsError } = useModelProviders();
   const [pendingModel, setPendingModel] = useState<ModelSelection>();
+  const [permissionMode, setPermissionMode] = useState(() => loadConversationPermission(session?.id));
+  const permissionModeRef = useRef(permissionMode);
+  const approvals = useWorkspaceApprovals();
   const [projectPath] = useState(initialProjectPath || session?.project_path || "");
   const [messages, setMessages] = useState<ClaudeStreamMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -181,6 +188,17 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
     }
     return null;
   }, [session, extractedSessionInfo, projectPath]);
+
+  const effectiveSessionId = effectiveSession?.id;
+  useEffect(() => {
+    if (effectiveSessionId) saveConversationPermission(effectiveSessionId, permissionMode);
+  }, [effectiveSessionId, permissionMode]);
+
+  const selectPermission = (mode: ConversationPermission) => {
+    if (hasActiveSessionRef.current) return;
+    permissionModeRef.current = mode;
+    setPermissionMode(mode);
+  };
 
   const selectModel = (selection: ModelSelection) => {
     const current = modelSelection ?? initialModel(providers);
@@ -480,6 +498,8 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
       return;
     }
 
+    // Read the current mode when a queued turn actually starts, not when it was queued.
+    const turnPermission = permissionModeRef.current;
     try {
       setIsLoading(true);
       setError(null);
@@ -536,7 +556,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
           const specificErrorUnlisten = await listen(`claude-error:${sid}`, (evt: any) => {
             scopedChannelActive.error = true;
             console.error('Claude error (scoped):', evt.payload);
-            setError(evt.payload);
+            setError(typeof evt.payload === "string" ? translate(evt.payload) : evt.payload);
           });
 
           const specificCompleteUnlisten = await listen(`claude-complete:${sid}`, (evt: any) => {
@@ -690,6 +710,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
         const processComplete = async (success: boolean) => {
           if (completed) return;
           completed = true;
+          approvals.close();
           setIsLoading(false);
           hasActiveSessionRef.current = false;
           isListeningRef.current = false; // Reset listening state
@@ -791,7 +812,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
         const genericErrorUnlisten = await listen('claude-error', (evt: any) => {
           if (scopedChannelActive.error) return;
           console.error('Claude error:', evt.payload);
-          setError(evt.payload);
+          setError(typeof evt.payload === "string" ? translate(evt.payload) : evt.payload);
         });
 
         const genericCompleteUnlisten = await listen('claude-complete', (evt: any) => {
@@ -861,20 +882,29 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
           session_age_ms: sessionAge
         });
 
+        const approvalTurnId = turnPermission === "workspaceWrite" && isTauriRuntime()
+          ? await approvals.open()
+          : undefined;
+        if (!isMountedRef.current) return;
         // Execute the appropriate command
-        if (resumeId) {
-          console.log('[ClaudeCodeSession] Resuming session:', resumeId);
-          trackEvent.sessionResumed(resumeId);
-          trackEvent.modelSelected(model);
-          await api.resumeClaudeCode(projectPath, resumeId, prompt, selection.model, providerId);
-        } else {
-          console.log('[ClaudeCodeSession] Starting new session');
-          trackEvent.sessionCreated(model, 'prompt_input');
-          trackEvent.modelSelected(model);
-          await api.executeClaudeCode(projectPath, prompt, selection.model, providerId);
+        try {
+          if (resumeId) {
+            console.log('[ClaudeCodeSession] Resuming session:', resumeId);
+            trackEvent.sessionResumed(resumeId);
+            trackEvent.modelSelected(model);
+            await api.resumeClaudeCode(projectPath, resumeId, prompt, selection.model, providerId, turnPermission, approvalTurnId);
+          } else {
+            console.log('[ClaudeCodeSession] Starting new session');
+            trackEvent.sessionCreated(model, 'prompt_input');
+            trackEvent.modelSelected(model);
+            await api.executeClaudeCode(projectPath, prompt, selection.model, providerId, turnPermission, approvalTurnId);
+          }
+        } finally {
+          approvals.finishOpening(approvalTurnId);
         }
       }
     } catch (err) {
+      approvals.close();
       console.error("Failed to send prompt:", err);
       // Surface the backend's reason (e.g. "Project directory not found: ...")
       // instead of hiding it behind a generic message.
@@ -986,6 +1016,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
       const duration = Date.now() - sessionStartTime;
       
       await api.cancelClaudeExecution(claudeSessionId);
+      approvals.close();
       
       // Calculate metrics for enhanced analytics
       const metrics = sessionMetrics.current;
@@ -1489,6 +1520,13 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
               embedded
               modelSelection={modelSelection}
               onModelChange={selectModel}
+              permissionControl={
+                <ConversationPermissionPicker
+                  value={permissionMode}
+                  onChange={selectPermission}
+                  disabled={isLoading || !projectPath}
+                />
+              }
               providers={providers}
               modelsLoaded={modelsLoaded}
               modelsError={modelsError}
@@ -1587,7 +1625,20 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
 
         {/* Timeline */}
         <AnimatePresence>
-          {showTimeline && effectiveSession && (
+          {approvals.request && (
+        <WorkspaceApprovalDialog
+          key={approvals.request.requestId}
+          request={approvals.request}
+          onDecide={async (id, allow) => {
+            try {
+              await approvals.decide(id, allow);
+            } catch (err) {
+              setError(translate(typeof err === "string" ? err : "This approval request is no longer pending."));
+            }
+          }}
+        />
+      )}
+      {showTimeline && effectiveSession && (
             <motion.div
               initial={{ x: "100%" }}
               animate={{ x: 0 }}
