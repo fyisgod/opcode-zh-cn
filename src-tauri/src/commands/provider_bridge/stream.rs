@@ -52,6 +52,7 @@ struct Reply {
     output: Option<u64>,
     text_bytes: usize,
     text_open: bool,
+    thinking_open: bool,
 }
 
 impl Reply {
@@ -62,10 +63,31 @@ impl Reply {
         self.text_bytes += text.len();
         let mut frames = String::new();
         if !self.text_open {
-            frames.push_str(&frame("content_block_start", json!({"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}})));
+            if self.thinking_open {
+                frames.push_str(&frame(
+                    "content_block_stop",
+                    json!({"type":"content_block_stop","index":0}),
+                ));
+            }
+            let index = if self.thinking_open { 1 } else { 0 };
+            frames.push_str(&frame("content_block_start", json!({"type":"content_block_start","index":index,"content_block":{"type":"text","text":""}})));
             self.text_open = true;
         }
-        frames.push_str(&frame("content_block_delta", json!({"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":text}})));
+        let index = if self.thinking_open { 1 } else { 0 };
+        frames.push_str(&frame("content_block_delta", json!({"type":"content_block_delta","index":index,"delta":{"type":"text_delta","text":text}})));
+        frames
+    }
+
+    fn thinking(&mut self, text: &str) -> String {
+        if text.is_empty() || self.text_open {
+            return String::new();
+        }
+        let mut frames = String::new();
+        if !self.thinking_open {
+            frames.push_str(&frame("content_block_start", json!({"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":""}})));
+            self.thinking_open = true;
+        }
+        frames.push_str(&frame("content_block_delta", json!({"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":text}})));
         frames
     }
 
@@ -146,6 +168,10 @@ impl Reply {
     fn responses(&mut self, value: &Value) -> Result<(String, bool), &'static str> {
         let index = value["output_index"].as_u64().unwrap_or_default();
         match value["type"].as_str() {
+            Some("response.reasoning_summary_text.delta") => Ok((
+                self.thinking(value["delta"].as_str().unwrap_or_default()),
+                false,
+            )),
             Some("response.output_text.delta" | "response.refusal.delta") => Ok((
                 self.text(value["delta"].as_str().unwrap_or_default()),
                 false,
@@ -240,12 +266,18 @@ impl Reply {
         let mut frames = String::new();
         let mut index = 0;
         let mut output_bytes = self.text_bytes;
-        if self.text_open {
+        if self.thinking_open && !self.text_open {
             frames.push_str(&frame(
                 "content_block_stop",
-                json!({"type":"content_block_stop","index":index}),
+                json!({"type":"content_block_stop","index":0}),
             ));
-            index += 1;
+            index = 1;
+        } else if self.text_open {
+            frames.push_str(&frame(
+                "content_block_stop",
+                json!({`n                    "type":"content_block_stop",`n                    "index":if self.thinking_open { 1 } else { 0 }`n                }),
+            ));
+            index = if self.thinking_open { 2 } else { 1 };
         }
         if reason == "tool_use" {
             for tool in self.tools.into_values() {
@@ -278,11 +310,13 @@ pub(super) async fn json_message(
     context: &ToolContext,
 ) -> Result<Value, &'static str> {
     let mut bytes = Vec::new();
-    while let Some(chunk) = upstream
-        .chunk()
-        .await
-        .map_err(|_| "The upstream reply was interrupted")?
-    {
+    while let Some(chunk) = upstream.chunk().await.map_err(|error| {
+        if error.is_timeout() {
+            "The upstream provider timed out while reading the reply"
+        } else {
+            "The upstream reply was interrupted by a network error"
+        }
+    })? {
         if bytes.len() + chunk.len() > MAX_EVENT_BYTES {
             return Err("The upstream reply exceeded the size limit");
         }
@@ -397,7 +431,7 @@ pub(super) async fn forward(
     while !done {
         let chunk = tokio::select! {
             _ = sender.closed() => return Ok(()),
-            result = upstream.chunk() => result.map_err(|_| "The upstream stream was interrupted")?,
+            result = upstream.chunk() => result.map_err(|error| if error.is_timeout() { "The upstream provider timed out while streaming" } else { "The upstream stream was interrupted by a network error" })?,
         };
         let Some(chunk) = chunk else {
             break;
@@ -444,4 +478,56 @@ pub(super) async fn forward(
     }
     let _ = sender.send(reply.finish(context)?).await;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn responses_summary_is_emitted_as_a_visible_thinking_block() {
+        let mut reply = Reply::default();
+        let (frames, finished) = reply
+            .responses(&json!({
+                "type":"response.reasoning_summary_text.delta",
+                "delta":"I will inspect the relevant files."
+            }))
+            .unwrap();
+
+        assert!(!finished);
+        assert!(frames.contains("\"type\":\"thinking\""));
+        assert!(frames.contains("\"type\":\"thinking_delta\""));
+        assert!(frames.contains("I will inspect the relevant files."));
+    }
+
+    #[test]
+    fn encrypted_reasoning_is_not_emitted_as_user_visible_text() {
+        let mut reply = Reply::default();
+        let (frames, _) = reply
+            .responses(&json!({
+                "type":"response.completed",
+                "response":{"status":"completed","output":[{
+                    "type":"reasoning",
+                    "encrypted_content":"opaque-private-payload"
+                }]}
+            }))
+            .unwrap();
+
+        assert!(!frames.contains("opaque-private-payload"));
+        assert!(!frames.contains("thinking_delta"));
+    }
+
+    #[test]
+    fn provider_error_events_are_not_treated_as_normal_stream_pauses() {
+        let mut reply = Reply::default();
+        assert!(reply
+            .responses(&json!({"type":"error","error":{"message":"rate limited"}}))
+            .is_err());
+        assert!(reply.responses(&json!({"type":"response.failed"})).is_err());
+        assert!(reply
+            .responses(&json!({"type":"response.unknown.progress"}))
+            .unwrap()
+            .0
+            .is_empty());
+    }
 }

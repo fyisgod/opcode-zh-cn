@@ -220,6 +220,7 @@ pub(super) fn translate(
         result["store"] = json!(false);
         if official_openai {
             result["include"] = json!(["reasoning.encrypted_content"]);
+            result["reasoning"] = json!({"summary":"auto"});
         }
     } else {
         result["messages"] = json!(messages);

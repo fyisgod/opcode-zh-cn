@@ -1342,15 +1342,16 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
         ))}
       </div>
 
-      {/* Loading indicator under the latest message */}
+      {/* Keep a quiet status while waiting for the first stream event. */}
       {isLoading && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.15 }}
-          className="flex items-center justify-center py-4 mb-20"
+          className="flex items-center justify-center gap-2 py-4 mb-20 text-sm text-muted-foreground"
         >
-          <div className="rotating-symbol text-primary" />
+          <span className="size-2 rounded-full bg-primary animate-pulse" aria-hidden="true" />
+          <span>{translate("Waiting for model output...")}</span>
         </motion.div>
       )}
 

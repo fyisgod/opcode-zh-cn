@@ -2296,7 +2296,7 @@ export const ThinkingWidget: React.FC<{
   signature?: string;
 }> = ({ thinking }) => {
   useLanguage();
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
   
   // Strip whitespace from thinking content
   const trimmedThinking = thinking.trim();
@@ -2312,8 +2312,8 @@ export const ThinkingWidget: React.FC<{
             <Bot className="h-4 w-4 text-gray-500" />
             <Sparkles className="h-2.5 w-2.5 text-gray-400 absolute -top-1 -right-1 animate-pulse" />
           </div>
-          <span className="text-sm font-medium text-gray-600 dark:text-gray-400 italic">
-            {translate("Thinking...")}
+          <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+            {translate("Thinking")}
           </span>
         </div>
         <ChevronRight className={cn(
@@ -2324,7 +2324,7 @@ export const ThinkingWidget: React.FC<{
       
       {isExpanded && (
         <div className="px-4 pb-4 pt-2 border-t border-gray-500/20">
-          <pre className="text-xs font-mono text-gray-600 dark:text-gray-400 whitespace-pre-wrap bg-gray-500/5 p-3 rounded-lg italic">
+          <pre className="text-sm font-sans text-muted-foreground whitespace-pre-wrap">
             {trimmedThinking}
           </pre>
         </div>

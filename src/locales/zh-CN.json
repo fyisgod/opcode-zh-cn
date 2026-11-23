@@ -970,6 +970,8 @@
   "Think Harder": "深度思考",
   "Thinking:": "思考：",
   "Thinking...": "正在思考…",
+  "Thinking": "思考",
+  "Waiting for model output...": "正在等待模型输出…",
   "This action cannot be undone. The command file will be permanently deleted.": "此操作无法撤销，命令文件将被永久删除。",
   "This data helps us understand which features are most valuable, identify performance issues, and prioritize improvements. Your choice won't affect any functionality.": "这些数据帮助我们了解常用功能、识别性能问题和安排改进优先级。你的选择不会影响任何功能。",
   "This shows the raw JSON that will be saved to ~/.claude/settings.json": "此处显示将保存到 ~/.claude/settings.json 的原始 JSON",

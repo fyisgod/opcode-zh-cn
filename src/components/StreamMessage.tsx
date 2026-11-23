@@ -114,6 +114,16 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({ message, classNa
       );
     }
 
+    if (message.type === "system" && (message.subtype?.includes("error") || message.error)) {
+      const errorText = message.result || message.error || translate("Unknown error");
+      return (
+        <div className={cn("flex items-start gap-2 rounded border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive", className)} role="alert">
+          <AlertCircle className="mt-0.5 size-4 shrink-0" />
+          <span className="whitespace-pre-wrap wrap-anywhere">{String(errorText)}</span>
+        </div>
+      );
+    }
+
     // Assistant message
     if (message.type === "assistant" && message.message) {
       const msg = message.message;

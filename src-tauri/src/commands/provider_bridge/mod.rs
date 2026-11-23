@@ -276,9 +276,9 @@ async fn messages(
         }
         Err(error) => {
             let message = if error.is_timeout() {
-                "The model provider timed out"
+                "The model provider timed out while connecting"
             } else {
-                "Could not connect to the model provider"
+                "Could not connect to the model provider because of a network error"
             };
             return api_error(StatusCode::BAD_GATEWAY, "api_error", message);
         }
