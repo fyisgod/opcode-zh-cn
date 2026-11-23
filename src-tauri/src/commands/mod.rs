@@ -9,3 +9,4 @@ pub mod proxy;
 pub mod slash_commands;
 pub mod storage;
 pub mod usage;
+pub mod workspace;

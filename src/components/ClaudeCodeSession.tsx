@@ -4,9 +4,11 @@ import { ConversationPermissionPicker } from "./ConversationPermissionPicker";
 import { WorkspaceApprovalDialog } from "./WorkspaceApprovalDialog";
 import { useWorkspaceApprovals } from "@/hooks/useWorkspaceApprovals";
 import { initialModel, savedProviderFor, useModelProviders, type ModelSelection } from "@/lib/modelProvider";
-import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useId } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
+  Bell,
+  PanelRight,
   Copy,
   ChevronDown,
   GitBranch,
@@ -39,6 +41,8 @@ import { useTrackEvent, useComponentMetrics, useWorkflowTracking } from "@/hooks
 import { SessionPersistenceService } from "@/services/sessionPersistence";
 import { projectName } from "@/lib/projectPaths";
 import { isTauriRuntime } from "@/lib/apiAdapter";
+import { SessionWorkspacePanel, type OpenWorkspaceTabs } from "./claude-code-session/SessionWorkspacePanel";
+import { noticeLevel, readSessionWorkspace, type WorkspaceNotice } from "./claude-code-session/workspaceActivity";
 
 interface ClaudeCodeSessionProps {
   /**
@@ -101,7 +105,22 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
   const [projectPath] = useState(initialProjectPath || session?.project_path || "");
   const [messages, setMessages] = useState<ClaudeStreamMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setCurrentError] = useState<string | null>(null);
+  const [workspaceOpen, setWorkspaceOpen] = useState(false);
+  const [workspaceTabs, setWorkspaceTabs] = useState<OpenWorkspaceTabs>({ open: ["overview"], active: "overview" });
+  const [workspaceRevision, setWorkspaceRevision] = useState(0);
+  const [localNotices, setLocalNotices] = useState<WorkspaceNotice[]>([]);
+  const workspaceId = useId();
+  const workspaceButton = useRef<HTMLButtonElement>(null);
+  const addNotice = (text: string, level = noticeLevel(text)) => {
+    if (typeof text !== "string" || !text.trim()) return;
+    const notice = { level, text, time: Date.now() };
+    setLocalNotices((previous) => [...previous.slice(-99), notice]);
+  };
+  const setError = (text: string | null) => {
+    setCurrentError(text);
+    if (text) addNotice(text, "Error");
+  };
   const [rawJsonlOutput, setRawJsonlOutput] = useState<string[]>([]);
   const [copyPopoverOpen, setCopyPopoverOpen] = useState(false);
   const [totalTokens, setTotalTokens] = useState(0);
@@ -209,9 +228,48 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
     }
   };
 
-  // Filter out messages that shouldn't be displayed
+  const workspace = useMemo(() => readSessionWorkspace(messages), [messages]);
+  const notices = useMemo(() => [...workspace.notices, ...localNotices], [workspace.notices, localNotices]);
+  const openWorkspace = (showNotices = false) => {
+    setShowTimeline(false);
+    if (showNotices) {
+      setWorkspaceTabs(({ open }) => ({
+        open: open.includes("notices") ? open : [...open, "notices"],
+        active: "notices",
+      }));
+    }
+    setWorkspaceOpen(true);
+  };
+  const closeWorkspace = () => {
+    setWorkspaceOpen(false);
+    workspaceButton.current?.focus();
+  };
+
+  // Keep conversation text in the timeline and group runtime information in the workspace.
   const displayableMessages = useMemo(() => {
-    return messages.filter((message, index) => {
+    let lastAnswer = "";
+    return messages.map((message) => {
+      if (message.parent_tool_use_id && workspace.groupedTools.has(message.parent_tool_use_id)) return null;
+      const parts = message.message?.content;
+      if (message.type === "result") {
+        const text = typeof message.result === "string" ? message.result.trim() : "";
+        const shouldShow = text && text !== lastAnswer && !message.is_error && !message.subtype?.startsWith("error");
+        lastAnswer = "";
+        return shouldShow ? { ...message, type: "assistant" as const, message: { content: [{ type: "text", text }] } } : null;
+      }
+      if (!Array.isArray(parts)) return message;
+      if (message.type === "assistant") {
+        const answer = parts.filter((part) => part.type === "text").map((part) => part.text).join("\n").trim();
+        if (answer) lastAnswer = answer;
+      }
+      const content = parts.filter((part) => !(
+        (part.type === "tool_use" && workspace.groupedTools.has(part.id)) ||
+        (part.type === "tool_result" && workspace.groupedTools.has(part.tool_use_id))
+      ));
+      if (content.length === parts.length) return message;
+      return content.length ? { ...message, message: { ...message.message, content } } : null;
+    }).filter((message, index): message is ClaudeStreamMessage => {
+      if (!message) return false;
       // Skip meta messages that don't have meaningful content
       if (message.isMeta && !message.leafUuid && !message.summary) {
         return false;
@@ -219,7 +277,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
 
       // JSONL also contains bookkeeping entries that do not render a message.
       if (message.type !== "user" && message.type !== "assistant" && message.type !== "result") {
-        return (message.type === "system" && message.subtype === "init") || isStreamSummary(message);
+        return isStreamSummary(message);
       }
 
       // Skip user messages that only contain tool results that are already displayed
@@ -275,7 +333,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
       }
       return true;
     });
-  }, [messages]);
+  }, [messages, workspace.groupedTools]);
 
   const rowVirtualizer = useVirtualizer({
     count: displayableMessages.length,
@@ -451,7 +509,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
     const errorUnlisten = await listen(`claude-error:${sessionId}`, (event: any) => {
       console.error("Claude error:", event.payload);
       if (isMountedRef.current) {
-        setError(event.payload);
+        addNotice(event.payload);
       }
     });
 
@@ -460,6 +518,8 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
       if (isMountedRef.current) {
         setIsLoading(false);
         hasActiveSessionRef.current = false;
+        setWorkspaceRevision((revision) => revision + 1);
+        if (event.payload === false) addNotice(translate("Claude Code exited unsuccessfully"), "Error");
       }
     });
 
@@ -711,6 +771,8 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
           if (completed) return;
           completed = true;
           approvals.close();
+          setWorkspaceRevision((revision) => revision + 1);
+          if (!success) addNotice(translate("Claude Code exited unsuccessfully"), "Error");
           setIsLoading(false);
           hasActiveSessionRef.current = false;
           isListeningRef.current = false; // Reset listening state
@@ -1292,17 +1354,6 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
         </motion.div>
       )}
 
-      {/* Error indicator */}
-      {error && (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.15 }}
-          className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive mb-20 w-full max-w-6xl mx-auto"
-        >
-          {error}
-        </motion.div>
-      )}
     </div>
   );
 
@@ -1334,8 +1385,21 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
 
   return (
     <TooltipProvider>
-      <div className={cn("relative flex h-full flex-col bg-background", className)}>
-        <div className="w-full h-full flex flex-col">
+      <div className={cn("@container relative flex h-full min-h-0 overflow-hidden bg-background", className)}>
+        <div className="relative flex min-w-0 flex-1 flex-col">
+          <div className="flex h-10 shrink-0 items-center justify-end gap-1 px-3">
+            {notices.length > 0 && (
+              <Button variant="ghost" size="sm" className="h-7 gap-1.5 px-2 text-xs text-muted-foreground" aria-label={translate("Notices ({count})", { count: notices.length })} onClick={() => openWorkspace(true)}>
+                <Bell size={14} className={notices.some((notice) => notice.level === "Error") ? "text-destructive" : "text-amber-600 dark:text-amber-400"} />
+                <span aria-live="polite">{notices.length}</span>
+              </Button>
+            )}
+            <Button ref={workspaceButton} variant="ghost" size="sm" className="h-7 gap-1.5 px-2 text-xs" aria-controls={workspaceOpen ? workspaceId : undefined} aria-expanded={workspaceOpen} onClick={() => workspaceOpen ? closeWorkspace() : openWorkspace()}>
+              <PanelRight size={16} />
+              {translate("Workspace")}
+            </Button>
+          </div>
+          <div className="flex min-h-0 w-full flex-1 flex-col">
 
         {/* Main Content Area */}
         <div className={cn(
@@ -1549,7 +1613,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => setShowTimeline(!showTimeline)}
+                          onClick={() => { setWorkspaceOpen(false); setShowTimeline(!showTimeline); }}
                           className="h-9 w-9 text-muted-foreground hover:text-foreground"
                         >
                           <GitBranch className={cn("h-3.5 w-3.5", showTimeline && "text-primary")} />
@@ -1678,6 +1742,21 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
           )}
         </AnimatePresence>
       </div>
+
+      </div>
+      {workspaceOpen && <SessionWorkspacePanel
+        id={workspaceId}
+        tabs={workspaceTabs}
+        setTabs={setWorkspaceTabs}
+        onClose={closeWorkspace}
+        session={workspace}
+        notices={notices}
+        root={workspace.init?.cwd || projectPath}
+        revision={workspaceRevision}
+        sessionId={effectiveSession?.id ?? claudeSessionId}
+        model={modelSelection?.model}
+        running={isLoading}
+      />}
 
       {/* Fork Dialog */}
       <Dialog open={showForkDialog} onOpenChange={setShowForkDialog}>

@@ -213,6 +213,7 @@ fn main() {
             list_running_claude_sessions,
             get_claude_session_output,
             list_directory_contents,
+            commands::workspace::inspect_workspace,
             search_files,
             get_recently_modified_files,
             get_hooks_config,
